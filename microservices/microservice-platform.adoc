@@ -1,0 +1,1587 @@
+:doctype: book
+:navtitle: Tài liệu hướng dẫn Microservice Platform
+:description: Tài liệu hướng dẫn Microservice Platform.
+:toc: left
+:toc-title: Mục Lục
+:numbered:
+:toclevels: 3
+:sectnums:
+:partnums:
+
+//:source-highlighter: highlightjs
+//:highlightjs-theme: darkula
+:icons: font
+:imagesdir: images
+:sectanchors:
+:linkattrs:
+:docinfo: shared,private
+
+= Microservice Platform
+
+== API Document
+
+API đang ngày càng trở nên phổ biến, các dịch vụ trên Internet hầu hết đều sử dụng chuẩn RESTfull APIs. Chính vì thế, ta cần phải có 1 công cụ hỗ trợ việc tạo document APIs giúp thuận tiện cho việc cung cấp về cách sử dụng tài nguyên thông qua APIs 1 cách hiệu quả.
+
+=== Swagger là gì?
+Swagger là 1 open source dùng để phát triển, thiết kế, xây dựng và làm tài liệu cho các hệ thống RESTfull Web Service.
+
+.Có hai cách tiếp cận chính như sau:
+- Top-down approach: design các file yaml đặc tả các api
+- Bottom-up approach: sinh các file đặc tả api từ source code
+
+Ở phạm vi này sẽ hướng dẫn các sinh các file đặc tả api từ source code, từ đó có thể hiện thị thông tin đặc tả này trên giao diện
+
+=== Cấu hình swagger ở các service
+
+.Thêm các dependency cần thiết
+
+[source, xml]
+----
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger2</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-bean-validators</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.swagger</groupId>
+            <artifactId>swagger-models</artifactId>
+        </dependency>
+----
+
+.Tích hợp swagger vào project
+
+[source, java]
+----
+@Configuration
+@EnableSwagger2
+@ConditionalOnProperty(value = "swagger.enable", havingValue = "true", matchIfMissing = true)
+public class SwaggerAutoConfigure {
+
+    @Bean
+    public Docket groupRestApi() {
+        return new Docket(DocumentationType.SWAGGER_2)
+                .apiInfo(groupApiInfo())
+                .select()
+                .apis(RequestHandlerSelectors.basePackage(properties.getBasePackage()))
+                .paths(PathSelectors.any())
+                .build().securityContexts(Lists.newArrayList(securityContext())).securitySchemes(Lists.<SecurityScheme>newArrayList(apiKey()));
+    }
+
+}
+----
+
+- Swagger 2 được enabled thông qua `@EnableSwagger2` annotation. Để kiểm tra Springfox đã hoạt động chưa thì có thể gọi URL này :
+http://localhost:8080/your-app-root/api/v2/api-docs
+- Filter các API khỏi swagger: Không phải lúc nào chúng ta cũng muốn expose tất cả api đến documentation. Chúng ta có thể filter các api muốn expose bằng cách sử dụng truyền vào paramter của hai phương thức apis và paths trong Docket class. Method `apis` cung cấp các option `any` hoặc `none` , base package , class annotation , method annotations. Method paths có `PathSelectors` cung cấp các option `any(), none(), regex(), ant()`
+
+.Custom information
+Swagger cũng cung cấp một vài gái trị mặc định trong response của nó. Chúng ta có thể customize giống như "Api Docummentation" , "Created By Contact Email" , "Apache 2.0".
+
+Để thay đổi những giá trị này chúng ta sử dụng phương thức apiInfo(ApiInfo apiInfo).The ApiInfo class chưa thông tin custom về API
+
+[source, java]
+----
+    private ApiInfo groupApiInfo() {
+        String description = String.format("<div style='font-size:%spx;color:%s;'>%s</div>",
+                properties.getDescriptionFontSize(), properties.getDescriptionColor(), properties.getDescription());
+
+        Contact contact = new Contact(properties.getName(), properties.getUrl(), properties.getEmail());
+
+        return new ApiInfoBuilder()
+                .title(properties.getTitle())
+                .description(description)
+                .termsOfServiceUrl(properties.getTermsOfServiceUrl())
+                .contact(contact)
+                .license(properties.getLicense())
+                .licenseUrl(properties.getLicenseUrl())
+                .version(properties.getVersion())
+                .build();
+    }
+----
+Các thuôc tính này có thể được cấu hình qua file yaml bằng cách khai báo class properties:
+
+[source, java]
+----
+@ConfigurationProperties(prefix = "swagger")
+public class SwaggerProperties {
+    private Boolean enable = true;
+    private String basePackage;
+    private String title = "API Documentation";
+    private String description = "API Documentation";
+    private String descriptionColor = "#42b983";
+    private String descriptionFontSize = "14";
+    private String termsOfServiceUrl;
+    private String name;
+    private String url;
+    private String email;
+    private String license;
+    private String licenseUrl;
+    private String version;
+}
+----
+
+=== Cấu hình swagger cho api gateway
+
+.Thêm các dependency cần thiết
+
+[source, xml]
+----
+<dependency>
+    <groupId>com.github.xiaoymin</groupId>
+    <artifactId>knife4j-micro-spring-boot-starter</artifactId>
+</dependency>
+<dependency>
+    <groupId>com.github.xiaoymin</groupId>
+    <artifactId>knife4j-spring-boot-starter</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.springfox</groupId>
+    <artifactId>springfox-swagger2</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.springfox</groupId>
+    <artifactId>springfox-bean-validators</artifactId>
+</dependency>
+<dependency>
+    <groupId>io.swagger</groupId>
+    <artifactId>swagger-models</artifactId>
+</dependency>
+----
+Ở đây chúng ta sử dụng lib knife4j để tạo giao diện UI cho trang API Document
+
+.Cho phép cấu hình tích hợp swagger bằng file yaml:
+
+[source, java]
+----
+@ConfigurationProperties(prefix = "swagger.gateway")
+public class SwaggerGatewayProperties {
+    private Boolean enable;
+    private Set<String> includes = new HashSet<>();
+    private Set<String> excludes = new HashSet<>();
+
+}
+----
+Chúng ta có thể disable việc tích hợp swagger vào gateway bằng cách set cấu hình: `swagger.gateway.enable=false`.
+
+Và cũng có thể include hoặc exclude việc routing tới api doc của các downstream service bằng cách cấu hình các tham số:
+
+[source, properties]
+----
+swagger.gateway.include=
+swagger.gateway.exclude=
+----
+
+.Khai báo các bean cần thiết
+
+[source, java]
+----
+@Configuration
+public class SwaggerGatewayAutoConfigure {
+
+    private final SwaggerGatewayProperties swaggerGatewayProperties;
+    private final SecurityConfiguration securityConfiguration;
+    private final UiConfiguration uiConfiguration;
+
+    @Bean
+    public SwaggerGatewayResourceConfigure docGatewayResourceConfigure(DiscoveryClient discoveryClient, RestTemplate restTemplate) {
+        return new SwaggerGatewayResourceConfigure(discoveryClient, restTemplate);
+    }
+
+    @Bean
+    @LoadBalanced
+    public RestTemplate restTemplate() {
+        return new RestTemplate();
+    }
+
+    @Bean
+    public SwaggerGatewayHeaderFilter docGatewayHeaderFilter() {
+        return new SwaggerGatewayHeaderFilter();
+    }
+
+    @Bean
+    public SwaggerGatewayHandler docGatewayHandler(SwaggerResourcesProvider swaggerResources) {
+        SwaggerGatewayHandler swaggerGatewayHandler = new SwaggerGatewayHandler();
+        swaggerGatewayHandler.setSecurityConfiguration(securityConfiguration);
+        swaggerGatewayHandler.setUiConfiguration(uiConfiguration);
+        swaggerGatewayHandler.setSwaggerResources(swaggerResources);
+        swaggerGatewayHandler.setProperties(swaggerGatewayProperties);
+        return swaggerGatewayHandler;
+    }
+}
+----
+Trong đó:
+
+- Bean `SwaggerGatewayResourceConfigure` cho phép việc routing tới các link api doc của các downstream service
+- Bean `SwaggerGatewayHeaderFilter`: khai báo một filter cho phép check url có phải là lời gọi get thông tin api doc không để thực hiện rewrite path để redirect tới các downstream
+- Bean `SwaggerGatewayHandler`: thực hiện chìa các api cần thiết mục đích cho knife4j lấy dữ liệu swagger
+
+.Giao diện API Doc
+Start ứng dụng và truy cập vào địa chỉ: http://localhost:8301/doc.html
+
+image::api-docs.png[]
+
+=== Routing API document tương ứng tới các service
+
+Trong hệ thống nếu có hàng chục hàng trăm service thì việc chỉ chìa duy nhất 1 đường dẫn API document là vô cùng cần thiết, thường chúng ta sẽ làm việc đó tại gateway. Để làm được điều này thì cần phải thực hiện routing chính xác tới các service bên dưới để lấy thông tin.
+
+.Cấu hình SwaggerResourcesProvider
+
+[source, java]
+----
+public class SwaggerGatewayResourceConfigure implements SwaggerResourcesProvider {
+private final DiscoveryClient discoveryClient;
+    private final RestTemplate restTemplate;
+
+    @Override
+    public List<SwaggerResource> get() {
+        List<SwaggerResource> resources = new ArrayList<>();
+        List<String> routes = discoveryClient.getServices();
+        for (String route: routes) {
+            try {
+                String uri = "http://" + route + "/v2/api-docs";
+                ResponseEntity<String> response = restTemplate.getForEntity(uri, String.class);
+                if (response.getStatusCode() == HttpStatus.OK) {
+                    resources.add(swaggerResource(route, "/api/" + route + "/v2/api-docs"));
+                }
+            } catch (Exception e) {
+                log.debug(e.getMessage(), e);
+            }
+        }
+        return resources;
+    }
+
+    private SwaggerResource swaggerResource(String name, String location) {
+        SwaggerResource swaggerResource = new SwaggerResource();
+        swaggerResource.setName(name);
+        swaggerResource.setLocation(location);
+        swaggerResource.setSwaggerVersion("2.0");
+        return swaggerResource;
+    }
+}
+----
+
+Ở đây chúng ta sẽ dử dụng bean `DiscoveryClient` cho mục đích lấy tất cả các service sẵn có từ discovery service. Thực hiện check xem service đó có chìa thông tin api doc bằng cách call url sau:
+
+`http://{service}/v2/api-docs`
+
+- Nếu không lấy được thông tin (có thể do service không chìa api doc) thì không thực hiện gì nữa
+- Nếu có trả về thông tin thì chúng add url get api-doc vào danh sách resources sẵn có
+
+=== API get cấu hình resources cho swagger
+
+.Mục đích:
+Cung cấp danh sách resources document sẵn có để knife4j có thể hiển thị
+
+.URL:
+`GET /swagger-resources`
+
+.Response:
+- code: 200
+- data:
+[source, json]
+----
+[
+  {
+    "name": "customers-service",
+    "url": "/api/customers-service/v2/api-docs",
+    "swaggerVersion": "v2"
+  },
+  {
+    "name": "visits-service",
+    "url": "/api/visits-service/v2/api-docs",
+    "swaggerVersion": "v2"
+  }
+
+]
+----
+
+.Chi tiết xử lý
+* get resource từ bean `SwaggerResourcesProvider` đã mô tả ở trên.
+* Nếu danh sách trả về khác rỗng thì thực hiện các bước:
+    - Nếu có cấu hình `swagger.gateway.include`: thì loại tất cả những resource không nằm trong cấu hình
+    - Nếu có cấu hình `swagger.gateway.exclude`: thì loại tất cả resource có trong cấu hình
+* Trả kết quả cho client
+
+=== API get cấu hình giao diện cho swagger
+
+.Mục đích:
+Cho phép lấy ra cấu hình tùy chỉnh giao diện cho swagger như: font chữ, logo, color,...
+
+.URL:
+`GET /swagger-resources/configuration/ui`
+
+.Response:
+- code: 200
+- data:
+[source, json]
+----
+{
+  "apisSorter": "",
+  "showRequestHeaders": "",
+  "deepLinking": "",
+  "displayOperationId": "",
+  "defaultModelsExpandDepth": "",
+  "defaultModelExpandDepth": "",
+  "defaultModelRendering": "",
+  "displayRequestDuration": "",
+  "docExpansion": "",
+  "filter": "",
+  "maxDisplayedTags": "",
+  "operationsSorter": "",
+  "showExtensions": "",
+  "tagsSorter": "",
+  "supportedSubmitMethods": "",
+  "validatorUrl": "",
+  "jsonEditor": ""
+
+}
+----
+
+.Chi tiết xử lý
+* Khai báo bean `UiConfiguration` đê cấu hình giao diện UI cho swagger, chúng ta có thể custom cấu hình giao diện UI ở đây
+
+[source, java]
+----
+ @Bean
+ public UiConfiguration uiConfiguration() {
+        return UiConfigurationBuilder.builder()
+                .deepLinking(true)
+                .displayOperationId(false)
+                .defaultModelsExpandDepth(5)
+                .defaultModelExpandDepth(1)
+                .defaultModelRendering(ModelRendering.EXAMPLE)
+                .displayRequestDuration(false)
+                .docExpansion(DocExpansion.FULL)
+                .filter(false)
+                .maxDisplayedTags(null)
+                .operationsSorter(OperationsSorter.ALPHA)
+                .showExtensions(false)
+                .tagsSorter(TagsSorter.ALPHA)
+                .supportedSubmitMethods(UiConfiguration.Constants.DEFAULT_SUBMIT_METHODS)
+                .validatorUrl(null)
+                .build()
+    }
+----
+
+* Trả về đối tượng uiConfiguration cho client
+
+== Liquibase
+
+Trong quá trình phát triển phần mềm, nhiều phiên bản được nâng cấp và cải thiện, những thay đổi nhỏ thì chỉ cần sửa code nhưng với những thay đổi lớn thì có thể phải sửa cả việc thiết kế cơ sở dữ liệu. Để quản lý việc sửa đổi này thì ta cũng phải có công cụ tương đương như việc quản lý version của code. Phần này trình bày về liquibase như là một tool hỗ trợ việc migration, nâng cấp database.
+
+=== Tạo module tích hợp và cấu hình liquibase
+
+.Thêm dependency vào maven
+
+[source, xml]
+----
+
+   <dependency>
+       <groupId>org.liquibase</groupId>
+       <artifactId>liquibase-core</artifactId>
+   </dependency>
+----
+
+Với Liquibase, có 3 khái niệm cơ bản của nó là changelog, changeset và changetype.
+
+.Change log
+
+Một changelog có thể sẽ chứa nhiều changeset và một changeset có thể chứa nhiều changetype. Nói nôm na cho dễ hiểu thì changelog là một tập tin này định nghĩa tất cả các version của database structure theo cách của Liquibase để nó có thể execute việc thay đổi database theo version cho chúng ta được. Chúng ta có thể định nghĩa tập tin changelog này theo nhiều định dạng khác nhau bao gồm SQL, XML, JSON, YAML, …
+
+VD:
+[source, yaml]
+----
+databaseChangeLog:
+  - include:
+      file: sql/001.init_schema.sql
+      relativeToChangelogFile: true
+----
+
+Bên trong thuộc tính `databaseChangeLog` đại diện cho changelog, chúng ta sẽ định nghĩa các changeset. Có thể hiểu mỗi changeset là một version của database structure của ứng dụng.
+
+.Tạo bảng cần thiết
+Liquibase sẽ tạo 2 bảng databasechanglog và databasechangeloglock
+
+- `databasechangelog` : sẽ lưu các bảng ghi chứa thông tin về các thay đổi gồm tác giả, thời gian thay đổi, md5sum,description …. Trong đó, trường md5sum sẽ được dùng để kiểm tra với các thay đổi mới xuất hiện.
+- `databasechangeloglock` : bảng được dùng để đảm bảo chỉ có một phiên bản của liquibase chạy cùng một lúc. Vì liquibase đọc từ bảng databasechangelog với mục đích kiểm tra các changeset cần chạy, nếu có nhiều thay đổi xuất phát từ một database có thể sẽ gây xung đột. vì vậy bảng databasechangeloglock được sinh ra.
+
+.Config liquibase trong project
+Chúng ta có thể cấu hình đường dẫn tới file changlog
+
+[source, java]
+----
+@Bean
+public SpringLiquibase liquibase() {
+    SpringLiquibase liquibase = new SpringLiquibase();
+    liquibase.setChangeLog("classpath:liquibase-changeLog.xml");
+    liquibase.setDataSource(dataSource());
+    return liquibase;
+}
+----
+Với ứng dụng spring boot thì mặc định sẽ không cần khai báo bean `liquibase` mà chỉ cần cấu hình changelog nằm trong thư mục `resources/db/changelog/db.changelog-master.yaml`. Có thể cấu hình đường dẫn bằng cách thêm cấu hình trong application.properties
+
+[source, properties]
+----
+liquibase.change-log=classpath:liquibase-changeLog.xml
+----
+
+.Enable hoặc disable liquibase
+Chúng ta có thể bật hoặc tắt việc sử dụng liquibase bằng các sửa cấu hình trong application.properties
+
+[source, properties]
+----
+spring.liquibase.enabled=false
+----
+
+=== Tích hợp liquibase với Authorization Server
+.Thêm dependency vào pom
+[source, xml]
+----
+    <dependency>
+        <groupId>com.microtech</groupId>
+        <artifactId>micro-liquibase</artifactId>
+    </dependency>
+----
+
+.Tạo file changelog
+Mặc định thì chỉ cần cấu hình changelog nằm trong thư mục `resources/db/changelog/db.changelog-master.yaml`
+
+[source, yaml]
+----
+databaseChangeLog:
+  - include:
+      file: sql/001.init_schema.sql
+      relativeToChangelogFile: true
+  - include:
+      file: sql/002.init_data.sql
+      relativeToChangelogFile: true
+----
+Ở đây thì chúng ta tách riêng 2 script, tương ứng cho việc tạo schema, table và script còn lại sẽ thêm các dữ liệu cần thiết vào bảng, các script này sẽ đặt ở đường dẫn tương đối với file db.changelog-master.yaml
+
+image::liquibase.png[]
+
+.Lưu ý khi start với liquibase
+Sau khi run ứng dụng thì liquibase check trong bảng databasechangeloglock, nếu không tồn tại bản ghi nào, hoặc có tồn tại bản ghi với locked = 0 thì liquibase sẽ được start, ngược lại thì liquibase hiểu rằng đang có tiến trình khác thực thi nên sẽ bỏ qua
+
+image::databasechangeloglock.png[]
+
+Nếu không bị lock sẽ check các script đã có trong bảng databasechangelog chưa, nếu có rồi mà mã MD5 giống nhau thì bỏ qua script đó, nếu khác MD5 thì báo lỗi và không thể start được ứng dụng. Ngược lại thì liquibase sẽ thực thi các script, nếu thành công thì sẽ insert log vào bảng databasechangelog như sau:
+
+image::databasechangelog.png[]
+
+== Tracing
+Trong quá trình phát triển và vận hành một hệ thống, để giải quyết các vấn đề phát sinh, chúng ta thường phải theo dõi flow của các request trong hệ thống. Flow của một request được bắt đầu kể từ khi hệ thống tiếp nhận request và kết thúc khi hệ thống không còn xử lý request này nữa. Kỹ thuật này được gọi với thuật ngữ là tracing.
+
+Khác với hệ thống monolithic, các request trong hệ thống microservice thường dàn trải trên nhiều service. Việc theo dõi flow của một request trên một hệ thống phân tán là công việc không hề dễ dàng chút nào và cũng mất tương đối thời gian. Lúc này, chúng ta có thể áp dụng kỹ thuật distributed tracing:
+
+* Service tiếp nhận request đầu tiên sẽ gán cho request một correlation ID – định danh để phân biệt các request.
+* Các downstream request tiếp tục lan truyền correlation ID này:
+    - Nếu việc giao tiếp giữa các service thông qua HTTP request, correlation ID sẽ được gắn vào request header.
+    - Nếu việc giao tiếp giữa các service thông qua các hệ thống messaging, correlation ID sẽ được nằm trong message.
+- Các log liên quan đến request đều sẽ chứa correlation ID.
+- Dữ liệu tracing sẽ được các hệ thống như Zipkin hoặc Jaeger thu thập và phân tích.
+
+Thông qua distributed tracing, chúng ta có thể theo dõi được flow của một request dễ dàng hơn: xác định được tổng thời gian để hệ thống xử lý request đó, hoặc biết được request gặp vấn đề ở service nào.
+
+=== Tạo module tích hợp với spring cloud sleuth
+==== Spring Cloud Sleuth
+Spring Cloud Sleuth là một thư viện giúp chúng ta thực hiện distributed tracing cho các ứng dụng Spring Cloud. Spring Cloud Sleuth theo dõi request trên các servlet filter, REST template, scheduled action, message channel, Zuul filter, Feign client.
+
+.Spring Cloud Sleuth sử dụng 2 thuật ngữ span và trace:
+* *Span*: đây là đơn vị cơ bản nhất để tracing, tương ứng với một thao tác trong hệ thống. Ví dụ, việc gửi đi một HTTP request và nhận về response của HTTP request đó đều cùng là một span. Các span được định danh bởi một unique 64-bit ID. Span còn chứa các dữ liệu khác như: descriptions, timestamped events, key-value annotations (tags), ID của span đứng trước, và ID của các process (thường là các địa chỉ IP).
+    - Khi một span được start, span sẽ được gán tên và thời điểm start sẽ được lưu lại.
+    - Khi một span được close, thời điểm close sẽ được lưu lại. Nếu span là sample thì dữ liệu của span sẽ được gửi tới các hệ thống như Zipkin. Việc xác định một span có là sample hay không sẽ dựa trên một tỉ lệ. Cơ chế này được gọi là sampling. Sở dĩ Spring Cloud Sleuth áp dụng cơ chế này vì trong các hệ thống lớn, việc gửi dữ liệu span liên tục tốn chi phí không nhỏ.
+
+* *Trace*: là tập hợp các span được tổ chức dưới dạng cây. Span đầu tiên của trace được gọi là root span. ID của trace chính là ID của root span.
+
+Trace ID và span ID sẽ được Spring Cloud Sleuth thêm vào log thông qua Sl4J MDC, với format mặc định là: [`appname,traceId,spanId,exportable`]
+
+.Trong đó:
+- `appname`: tên của ứng dụng chứa log.
+- `traceId`: ID của trace chứa span
+- `spanId`: ID của span.
+- `exportable`: xác định xem log đã được gửi đến Zipkin hay chưa.
+
+VD:
+
+[source, log]
+----
+2022-03-02 15:31:01.936  INFO [bar,46ab0d418373cbc9,46ab0d418373cbc9,false] 23030 [nio-8081-exec-4] ...
+----
+
+==== Zipkin
+Zipkin là một hệ thống distributed tracing open source. Zipkin được xây dựng dựa trên Dapper của Google. Zipkin được dùng để khắc phục các vấn đề liên quan đến latency trong hệ thống microservice.
+
+.Zipkin có kiến trúc hoạt động khá dễ hiểu:
+1. Reporter gửi dữ liệu tracing từ ứng dụng tới Zipkin thông qua HTTP hoặc message system (Kafka, RabbitMQ).
+2. Tại Zipkin, thành phần collector chịu trách nhiệm thu thập và validate dữ liệu.
+3. Dữ liệu sau đó được lưu trữ bên trong storage mặc định là Cassandra. Chúng ta có thể lựa chọn các storage khác như Elasticsearch hoặc MySQL.
+4. Zipkin cung cấp UI để user dễ dàng tìm kiếm và theo dõi dữ liệu. UI sẽ lấy dữ liệu từ API.
+
+image::zipkin.png[]
+
+==== Cấu hình
+.Cấu hình Spring Cloud Sleuth
+
+Để sử dụng Spring Cloud Sleuth với Zipkin, chúng ta cần thêm 2 dependency sau:
+
+pom.xml
+
+[source, xml]
+----
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-sleuth</artifactId>
+</dependency>
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-zipkin</artifactId>
+</dependency>
+----
+Mặc định khi chúng ta thêm dependency spring-cloud-starter-zipkin, dữ liệu span sẽ được gửi tới Zipkin thông qua HTTP (http://localhost:9411). Để thay đổi URL này, chúng ta cấu hình thông qua thuộc tính `spring.zipkin.base-url`.
+
+Bên cạnh đó, để thay đổi tỉ lệ sampling, chúng ta sẽ cấu hình thông qua thuộc tính spring.sleuth.sampler.probability. Giá trị của thuộc tính này là một số thập phân. Ví dụ: `spring.sleuth.sampler.probability=1.0` => gửi dữ liệu của tất cả các span tới Zipkin
+
+=== Tracing method của repo, service và controller
+
+Để thực hiện việc tracing lời gọi một hàm nào đó mà không can thiệp vào code hiện có, chúng ta cần sử dụng spring AOP.
+
+[source, java]
+----
+@Configuration
+@Aspect
+public class LogTraceConfig {
+
+    @Bean
+    public CustomizableTraceInterceptor interceptor() {
+        return new TraceInterceptor();
+    }
+
+    @Bean
+    public Advisor traceAdvisor() {
+        AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
+        pointcut.setExpression("execution(public * org.springframework.data.repository.Repository+.*(..))");
+        return new DefaultPointcutAdvisor(pointcut, interceptor());
+    }
+}
+----
+
+Trong đó:
+* Bean `TraceInterceptor` là một bean được định nghĩa cho việc tracing
+* Pointcut: định nghĩa các điểm sẽ được áp dụng AOP khi chạy ứng dụng
+
+Hãy xem hình dưới đây để hiểu rõ hơn về pointcut
+
+image::pointcut.png[]
+
+.Định nghĩa `TraceInterceptor`
+Để custom trace interceptor thì cần kế thừa từ class `org.springframework.aop.interceptor.CustomizableTraceInterceptor`:
+
+Để có thể tracing lên zipkin chúng ta cần override method invokeUnderTrace:
+
+[souce, java]
+----
+@Override
+    protected Object invokeUnderTrace(MethodInvocation invocation, Log logger) throws Throwable {
+        Object returnValue = null;
+        Tracer tracer = tracing.tracer();
+        Span newSpan = tracer.nextSpan().name(ClassUtils.getShortName(getClassForLogging(invocation.getThis())) + "." + invocation.getMethod().getName());
+        Tracer.SpanInScope ws = tracer.withSpanInScope(newSpan.start());
+        try {
+            returnValue = invocation.proceed();
+            invocation.getArguments();
+            return returnValue;
+        } catch (Throwable ex) {
+            throw ex;
+        } finally {
+            newSpan.finish();
+            ws.close();
+        }
+    }
+----
+
+Bây giờ chúng ta có thể thấy trên zipkin trace được thời gian thực thi của từng method trong repo, service hoặc controller như sau:
+
+image::zipkin-demo.png[]
+
+=== Bổ sung trace-id trong response header
+Với distributed tracing, khi một request bị lỗi, thông tin hữu ích nhất giúp chúng ta nhanh chóng detech và xử ly lỗi chính là traceid. Vì thế cần trả về traceid trong response header để khi có lỗi xảy ra, chúng ta dễ dàng debug nó.
+
+Để có thể add thêm header vào response, cần định nghĩa một WebFilter mới và add thông tin traceid vào mỗi request.
+
+Chúng ta sẽ extend từ class `javax.servlet.Filter` và override hàm `doFilter`
+
+[source, java]
+----
+public class TraceHeaderFilter implements Filter {
+
+    private static final String TRACE_ID_HEADER_NAME = "X-B3-Traceid";
+    @Autowired
+    private Tracer tracer;
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        HttpServletResponse httpServletResponse = (HttpServletResponse) response;
+        if (!httpServletResponse.containsHeader(TRACE_ID_HEADER_NAME)) {
+            var traceId = tracer.currentSpan().context().traceIdString();
+            httpServletResponse.setHeader(TRACE_ID_HEADER_NAME, traceId);
+            chain.doFilter(request, response);
+        }
+    }
+}
+----
+
+Thực hiện lại lời gọi api và kiểm tra header response chúng ta thấy có thêm header X-B3_Traceid
+
+image::traceid-header-response.png[]
+
+== Logging
+
+=== Ghi log http access và đẩy lên elasticsearch
+
+Mặc định spring boot sẽ không log body của request và response, vì vậy nếu muốn lấy body của request và response chúng ta cần wrap chúng vào một đối tượng khác để lưu body.
+
+.Wrap `HttpServletRequest`
+[source, java]
+----
+public class HttpTraceableRequest implements TraceableRequest {
+	private final String method;
+	private final Map<String, List<String>> headers;
+	private final URI uri;
+	private final String remoteAddress;
+	private String body;
+}
+----
+
+.Wrap `HttpTraceableResponse`
+[source, java]
+----
+public class HttpTraceableResponse implements TraceableResponse {
+
+	private String body;
+	private final ServerHttpResponse response;
+}
+----
+
+Để có thể catch được body của request và response, cần định nghĩa 1 WebFilter, với mỗi http request đến, chúng sẽ đi qua cái filter này. Chúng ta có thể dễ dàng bóc tách được body của request và response bằng cách ghi đè hàm filter như sau:
+
+[source, java]
+----
+public class HttpTraceReactiveWebFilter implements WebFilter, Ordered {
+
+    @Override
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+        var request = exchange.getRequest();
+        if (shouldApplyFilter(request)) {
+            Mono<?> principal = exchange.getPrincipal().cast(Object.class).defaultIfEmpty(NONE);
+            Mono<?> session = exchange.getSession();
+            return Mono.zip(principal, session)
+                    .flatMap((tuple) -> doFilter(exchange, chain,
+                            asType(tuple.getT1(), Principal.class),
+                            asType(tuple.getT2(), WebSession.class)));
+        } else {
+            return chain.filter(exchange);
+        }
+    }
+
+    private Mono<Void> doFilter(ServerWebExchange exchange, WebFilterChain chain,
+                                Principal principal, WebSession session) {
+        HttpTraceableRequest request = new HttpTraceableRequest(exchange);
+        HttpTraceableResponse response = new HttpTraceableResponse(exchange.getResponse());
+        ServerWebExchangeDecorator exchangeDecorator = new ServerWebExchangeDecorator(exchange) {
+            @Override
+            public ServerHttpRequest getRequest() {
+                return new ServerHttpRequestDecorator(super.getRequest()) {
+                    @Override
+                    public Flux<DataBuffer> getBody() {
+                        return super.getBody().doOnNext(dataBuffer -> {
+                            try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                                Channels.newChannel(baos).write(dataBuffer.asByteBuffer().asReadOnlyBuffer());
+                                request.setBody(new String(baos.toByteArray(), StandardCharsets.UTF_8));
+                            } catch (IOException e) {
+                                log.error(e.getMessage(), e);
+                            }
+                        });
+                    }
+                };
+            }
+
+            @Override
+            public ServerHttpResponse getResponse() {
+                return new ServerHttpResponseDecorator(super.getResponse()) {
+                    @Override
+                    public Mono<Void> writeWith(Publisher<? extends DataBuffer> body) {
+                        Flux<DataBuffer> buffer = Flux.from(body);
+                        return super.writeWith(buffer.doOnNext(dataBuffer -> {
+                            try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
+                                Channels.newChannel(baos).write(dataBuffer.asByteBuffer().asReadOnlyBuffer());
+                                response.setBody(new String(baos.toByteArray(), StandardCharsets.UTF_8));
+                            } catch (IOException e) {
+                                log.error(e.getMessage(), e);
+                            }
+                        }));
+                    }
+                };
+            }
+        };
+        HttpTrace trace = httpExchangeTracer.receivedRequest(tracer.currentSpan().context().traceIdString(), request);
+        return chain.filter(exchangeDecorator)
+                .doAfterSuccessOrError((aVoid, ex) -> {
+                    httpExchangeTracer.sendingResponse(trace, response, principal,
+                            getStartedSessionId(session));
+                    tracePublisher.publish(trace);
+                });
+    }
+}
+----
+
+.Filter điều kiện log body của request và response
+Trong nhiều trường hợp, chúng ta không muốn ghi log body của một số api nào đó. Vì thế với mỗi request chúng ta cần check xem nó có thỏa mãn điều kiện để log body hay không, nhìn vào đoạn code ở trên chính là hàm `shouldApplyFilter`
+
+[source, java]
+----
+private boolean shouldApplyFilter(ServerHttpRequest request) {
+    Set<HttpMethod> includeMethods = traceConfigure.getIncludeMethods();
+    Set<String> excludePatterns = traceConfigure.getExcludePatterns();
+    Set<String> includePatterns = traceConfigure.getIncludePatterns();
+    boolean shouldApply = CollectionUtils.isEmpty(includeMethods) || includeMethods.contains(request.getMethod());
+    if (shouldApply) {
+        shouldApply = CollectionUtils.isEmpty(includePatterns) || includePatterns.stream().anyMatch(r -> request.getURI().getPath().matches(r));
+    }
+    if (shouldApply) {
+        shouldApply = CollectionUtils.isEmpty(excludePatterns) || excludePatterns.stream().noneMatch(r -> request.getURI().getPath().matches(r));
+    }
+    return shouldApply;
+}
+----
+
+.Publish trace lên elasticsearch
+Định nghĩa class ElasticHttpTracePublisher đóng vai trò nhận các event http trace và đẩy lên elasticsearch
+
+Sau khi đã có được thông tin request, response với đầy đủ dữ liệu body, chúng ta sẽ publish chúng lên elasticsearch cho dễ dàng truy vấn bằng cách gọi hàm `tracePublisher.publish(trace)`
+
+[source, java]
+----
+    @Override
+    public void publish(HttpTrace trace) {
+        if (!isQueueBelowDiscardingThreshold()) {
+            if (!blockingQueue.offer(trace)) {
+                log.warn("Couldn't offer http trace to queue");
+            }
+        }
+    }
+
+    private boolean isQueueBelowDiscardingThreshold() {
+        return (blockingQueue.remainingCapacity() < elasticsearchConfig.getDiscardingThreshold());
+    }
+----
+
+Trường hợp nếu queue vượt quá ngưỡng cho phép thì những event đẩy vào queue sẽ bị discard.
+
+
+Định kỳ dữ liệu trace sẽ flush http trace lên elasticsearch
+[source, java]
+----
+
+    public void run() {
+        List<HttpTrace> traces = new ArrayList<>();
+        while (!stop) {
+            try {
+                HttpTrace trace = blockingQueue.take();
+                traces.add(trace);
+                if (shouldFlushNow() || traces.size() >= elasticsearchConfig.getMaxBatchSize()) {
+                    serializeEvents(jsonGenerator, traces);
+                    outputAggregator.sendData();
+                    traces.clear();
+                }
+            } catch (Exception e) {
+                errorReporter.logError("Internal error handling log data: " + e.getMessage(), e);
+                if (!traces.isEmpty()) {
+                    traces.clear();
+                }
+            }
+        }
+    }
+
+    private boolean shouldFlushNow() {
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - flushTime > elasticsearchConfig.getFlushTimeInterval()) {
+            flushTime = currentTime;
+            return true;
+        }
+        return false;
+    }
+----
+
+Sử dụng một blocking queue để lưu các event http trace, nếu như số lượng event trong queue bằng maxBatchSize hoặc sau một khoảng thời gian nào đó thì dữ liệu sẽ được flush lên elasticsearch.
+
+Đối tượng ElasticsearchOutputAggregator extend từ class `java.io.Write` đóng vai trò như một writer, nó sẽ ghi dữ liệu trực tiếp lên elasticsearch như sau:
+
+[source, java]
+----
+
+public class ElasticsearchOutputAggregator extends Writer {
+
+    @Override
+    public void write(char[] cbuf, int off, int len) {
+        sendBuffer.append(cbuf, off, len);
+    }
+
+    public void sendData() throws IOException {
+        if (sendBuffer.length() <= 0) {
+            return;
+        }
+        HttpURLConnection urlConnection = (HttpURLConnection) (settings.getUrl().openConnection());
+        try {
+            urlConnection.setDoInput(true);
+            urlConnection.setDoOutput(true);
+            urlConnection.setReadTimeout(settings.getReadTimeout());
+            urlConnection.setConnectTimeout(settings.getConnectTimeout());
+            urlConnection.setRequestMethod("POST");
+            String body = sendBuffer.toString();
+            settings.getHeaders().forEach(h -> urlConnection.setRequestProperty(h.getName(), h.getValue()));
+            if (settings.getAuthentication() != null) {
+                settings.getAuthentication().addAuth(urlConnection, body);
+            }
+            Writer writer = new OutputStreamWriter(urlConnection.getOutputStream(), StandardCharsets.UTF_8);
+            writer.write(body);
+            writer.flush();
+            writer.close();
+
+            int rc = urlConnection.getResponseCode();
+            if (rc != 200) {
+                String data = slurpErrors(urlConnection);
+                errorReporter.logWarning("Got response code [" + rc + "] from server with data " + data);
+            }
+        } finally {
+            sendBuffer.setLength(0);
+            urlConnection.disconnect();
+        }
+    }
+
+    @Override
+    public void flush() {
+        // No-op
+    }
+
+    @Override
+    public void close() {
+        // No-op
+    }
+}
+----
+
+=== Ghi log thực thi method Repository, Service và Controller
+
+Để thực hiện việc ghi log thực thi của method mà không can thiệp vào code hiện có, chúng ta sẽ sử dụng spring AOP tương tự như cấu hình AOP cho tracing.
+
+[source, java]
+----
+@Configuration
+@Aspect
+public class LogTraceConfig {
+
+    @Bean
+    public CustomizableTraceInterceptor interceptor() {
+        return new TraceInterceptor();
+    }
+
+    @Bean
+    public Advisor traceAdvisor() {
+        AspectJExpressionPointcut pointcut = new AspectJExpressionPointcut();
+        pointcut.setExpression("execution(public * org.springframework.data.repository.Repository+.*(..))");
+        return new DefaultPointcutAdvisor(pointcut, interceptor());
+    }
+}
+----
+
+Trong đó:
+* Bean `TraceInterceptor` là một bean được định nghĩa cho việc ghi log
+* Pointcut: định nghĩa các điểm sẽ được áp dụng AOP khi chạy ứng dụng, có thể là cac Repository, Service, Controller hoặc thậm chí là bất kỳ class cụ thể nào
+
+.Ghi log `TraceInterceptor`
+Để custom trace interceptor thì cần kế thừa từ class `org.springframework.aop.interceptor.CustomizableTraceInterceptor` và override method invokeUnderTrace:
+
+.Định nghĩa các pattern message log:
+[source, java]
+----
+private static final Pattern PATTERN = Pattern.compile("\\$\\[\\p{Alpha}+\\]");
+private static final String DEFAULT_ENTER_MESSAGE = "Entering method '" +
+        PLACEHOLDER_METHOD_NAME + "' of class [" + PLACEHOLDER_TARGET_CLASS_NAME + "] with argument(s) " + PLACEHOLDER_ARGUMENTS;
+private static final String DEFAULT_EXIT_MESSAGE = "Exiting method '" +
+        PLACEHOLDER_METHOD_NAME + "' of class [" + PLACEHOLDER_TARGET_CLASS_NAME + "] with return value " + PLACEHOLDER_RETURN_VALUE;
+private static final String DEFAULT_EXCEPTION_MESSAGE = "Exception thrown in method '" +
+        PLACEHOLDER_METHOD_NAME + "' of class [" + PLACEHOLDER_TARGET_CLASS_NAME + "]";
+----
+
+.Thực hiện replace các pattern trong message log
+[souce, java]
+----
+    @Override
+    protected String replacePlaceholders(String message, MethodInvocation methodInvocation, Object returnValue, Throwable throwable, long invocationTime) {
+        Matcher matcher = PATTERN.matcher(message);
+        StringBuffer output = new StringBuffer();
+        while (matcher.find()) {
+            String match = matcher.group();
+            if (PLACEHOLDER_METHOD_NAME.equals(match)) {
+                matcher.appendReplacement(output, Matcher.quoteReplacement(methodInvocation.getMethod().getName()));
+            } else if (PLACEHOLDER_TARGET_CLASS_NAME.equals(match)) {
+                String className = getClassForLogging(methodInvocation.getThis()).getName();
+                matcher.appendReplacement(output, Matcher.quoteReplacement(className));
+            } else if (PLACEHOLDER_TARGET_CLASS_SHORT_NAME.equals(match)) {
+                String shortName = ClassUtils.getShortName(getClassForLogging(methodInvocation.getThis()));
+                matcher.appendReplacement(output, Matcher.quoteReplacement(shortName));
+            } else if (PLACEHOLDER_ARGUMENTS.equals(match)) {
+                matcher.appendReplacement(output, Matcher.quoteReplacement(StringUtils.arrayToCommaDelimitedString(methodInvocation.getArguments())));
+            } else if (PLACEHOLDER_ARGUMENT_TYPES.equals(match)) {
+                appendArgumentTypes(methodInvocation, matcher, output);
+            } else if (PLACEHOLDER_RETURN_VALUE.equals(match)) {
+                appendReturnValue(methodInvocation, matcher, output, returnValue);
+            } else if (throwable != null && PLACEHOLDER_EXCEPTION.equals(match)) {
+                matcher.appendReplacement(output, Matcher.quoteReplacement(throwable.toString()));
+            } else if (PLACEHOLDER_INVOCATION_TIME.equals(match)) {
+                matcher.appendReplacement(output, Long.toString(invocationTime));
+            } else {
+                throw new IllegalArgumentException("Unknown placeholder [" + match + "]");
+            }
+        }
+        matcher.appendTail(output);
+        if (invocationTime > exceedTimeWarring) {
+            if (invocationTime > exceedExtraWarring) {
+                output.append(exceedTimeWarringMsg).append("-EXTRA");
+            } else {
+                output.append(exceedTimeWarringMsg);
+            }
+        } else {
+            output.append("|");
+        }
+        return output.toString();
+    }
+----
+
+
+.Ghi log trước và sau khi gọi hàm
+
+[souce, java]
+----
+
+    @Override
+    protected Object invokeUnderTrace(MethodInvocation invocation, Log logger) throws Throwable {
+        String name = ClassUtils.getQualifiedMethodName(invocation.getMethod());
+        StopWatch stopWatch = new StopWatch(name);
+        Object returnValue = null;
+        boolean exitThroughException = false;
+        try {
+            stopWatch.start(name);
+            log.debug(replacePlaceholders(this.enterMessage, invocation, null, null, -1));
+            returnValue = invocation.proceed();
+            invocation.getArguments();
+            return returnValue;
+        } catch (Throwable ex) {
+            if (stopWatch.isRunning()) {
+                stopWatch.stop();
+            }
+            exitThroughException = true;
+            log.debug(replacePlaceholders(this.exceptionMessage, invocation, null, ex, stopWatch.getTotalTimeMillis()), ex);
+            throw ex;
+        } finally {
+            if (!exitThroughException) {
+                if (stopWatch.isRunning()) {
+                    stopWatch.stop();
+                }
+                log.debug(replacePlaceholders(this.exitMessage, invocation, returnValue, null, stopWatch.getTotalTimeMillis()));
+            }
+            ws.close();
+        }
+    }
+----
+
+== Config Server
+=== Tạo config server với Spring Cloud Config Server
+.Cấu hình dependency
+
+[source, xml]
+----
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-config-server</artifactId>
+        </dependency>
+        ...
+    </dependencies>
+----
+
+.Enable Config Server
+Config Server được nhúng bên trong một ứng dụng Spring Boot. Để enable Config Server, chúng ta sử dụng annotation `@EnableConfigServer`:
+
+[source, java]
+----
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.config.server.EnableConfigServer;
+
+@EnableConfigServer
+@SpringBootApplication
+public class ConfigServerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigServerApplication.class, args);
+    }
+
+}
+----
+
+Sau khi start lên, truy cập vào url: http://192.168.1.196:8888/actuator/health. Nếu kết quả trả về status=UP là đã start thành công
+
+[source, json]
+----
+{
+    "status": "UP",
+    "components": {
+        "configServer": {
+            "status": "UP",
+            "details": {
+                "repositories": [
+                    {
+                        "name": "app",
+                        "profiles": [
+                            "default"
+                        ],
+                        "label": null
+                    }
+                ]
+            }
+        },
+        "ping": {
+            "status": "UP"
+        },
+        "refreshScope": {
+            "status": "UP"
+        }
+    }
+}
+----
+
+=== Tích hợp với service discovery
+.Thêm dependency cần thiết
+
+[source, xml]
+----
+    <dependencies>
+        ...
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+    </dependencies>
+----
+Trong file appication.properties chúng ta sẽ ghi lại địa chỉ của Eureka server:
+
+[source, yaml]
+----
+server:
+  port: 0
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${SPRING_EUREKA:http://localhost:8761/eureka}
+  instance:
+    preferIpAddress: true
+----
+
+Trong đó:
+
+- `server.port = 0` cho phép chọn ngẫu nhiên port mà REST server phục vụ.
+- `eureka.client.serviceUrl.defaultZone` khai báo đường dẫn đến Eureka Server. http://localhost:8761/eureka.
+- `instance.preferIpAddress: true`: yêu cầu Eureka server trả về danh sách service với địa chỉ IP của mỗi service thay vì tên miền nếu có. Việc này giúp kết nối sẽ nhanh hơn, bỏ qua giai đoạn dịch từ tên miền sang IP nhờ DNS.
+
+Cuối cùng là enable discovery client bằng annotation `@EnableDiscoveryClient` trong class main:
+
+[source, java]
+----
+@EnableConfigServer
+@EnableDiscoveryClient
+@SpringBootApplication
+public class ConfigServerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigServerApplication.class, args);
+    }
+
+}
+----
+Hãy biên dịch và chạy, rồi quay lại đường dẫn http://localhost:8761 refresh sẽ thấy customer service đã đăng ký với Eureka
+
+image::config-server-eureka.png[]
+
+
+=== Sử dụng git repo làm config repo
+
+.Thực hiện cấu hình thông tin git trong application.yaml
+
+[source, yaml]
+----
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/your-git-account/your-config-repository
+          username: user
+          password: secret
+          searchPaths: foo,bar*
+          timeout: 10
+----
+
+Trong đó:
+
+- `spring.cloud.config.server.git.uri:` URI của Git repository.
+- `spring.cloud.config.server.git.username:` username của Git account.
+- `spring.cloud.config.server.git.password:` password của Git account.
+- `spring.cloud.config.server.git.timeout:` timeout (đơn vị là giây) kết nối Git repository. Giá trị mặc định là 5 giây.
+- `spring.cloud.config.server.git.searchPaths`: các property source có thể đặt bên trong các thư mục con của Git repository.
+- `foo`: Config Server sẽ pull tất cả các property source bên trong thư mục foo.
+- `bar*`: Config Server sẽ pull tất cả các property source bên trong các thư mục có tên bắt đầu bằng bar.
+
+=== Sử dụng thư mục local làm config repo
+
+Để sử dụng thư mục local làm config repo, chúng ta cần start config server với: `spring.profiles.active=native`
+
+.Tạo file application-native.yml tương ứng cho profile native
+
+image::config-server-native.png[]
+
+.Cấu hình config repo về thư mục local tương ứng
+[source, yaml]
+----
+spring:
+  cloud:
+    config:
+      server:
+        native:
+          search-locations: file:///microtech/microservice-platform/micro-config/config-repo
+----
+
+=== Tích hợp config server cho authorization server và gateway
+
+.Thêm dependency
+
+[source, xml]
+----
+<dependency>
+    <groupId>org.springframework.cloud</groupId>
+    <artifactId>spring-cloud-starter-config</artifactId>
+</dependency>
+----
+
+.Cấu hình thông tin Config Server trong bootstrap.yml
+
+[source, yaml]
+----
+spring:
+  application:
+    name: foo
+  profiles:
+    active: dev,mysql
+  cloud:
+    config:
+      uri: http://localhost:8888
+      username: user
+      password: secret
+      request-read-timeout: 10
+----
+
+Trong đó:
+
+- `spring.cloud.config.uri`: URI của Config Server.
+- `spring.cloud.config.username`: username để xác thực nếu Config Server thiết lập HTTP Basic security.
+- `spring.cloud.config.password`: password để xác thực nếu Config Server thiết lập HTTP Basic security.
+- `spring.cloud.config.request-read-timeout`: timeout (đơn vị là giây) khi chờ đọc dữ liệu từ Config Server API. Giá trị mặc định là 0.
+
+== Module common
+
+
+image::common.png[]
+
+.Trong đó:
+- package `compressor` chứa các class hỗ trợ nén và giải nén dữ liệu
+- package `config` chứa các class hỗ trợ load config từ các file yml, properties, conf
+- package context chứa các class hỗ trợ việc đọc ghi dữ liệu xuống ThreadLocal
+- package `holder` chứa các class hỗ trợ đọc ghi dữ liệu inmem
+- package `loader` chứa các class khởi tạo đối tượng từ ServiceLoader
+- package `thread` chứa các class hỗ trợ khởi tạo thread
+- package `util` chứa các class util thao tác cơ bản an toàn với dữ liệu như object, string, number, collection, map, stream,...
+
+image::utils.png[]
+
+== Object Storage
+Object Storage là dịch vụ lưu trữ tệp tin, hình ảnh, nhạc, video,… trên nền tảng hướng đối tượng sử dụng chuẩn giao tiếp lập trình S3 của Amazon (S3 API storage).
+
+.Minio là gì
+Minio là một object storage server được implement những public API giống như AWS S3. Điều đó có nghĩa là những ứng dụng có thể config để giao tiếp với Minio thì cũng có thể giao tiếp với AWS S3. Là một server lưu trữ object nên có thể được sử dụng để lưu trữ những unstructured data như ảnh, video, log files, backups và container/VM images. Dung lượng của 1 object có thể dao động từ một vài KB tới tối đa là 5TB. File cũng được gom lại trong 1 buckets, nó là được chỉ cùng với access key khi dùng app.
+
+=== Module tích hợp với minio
+.Thêm dependency vào file pom.xml
+[source, xml]
+----
+<dependency>
+    <groupId>com.amazonaws</groupId>
+    <artifactId>aws-java-sdk-s3</artifactId>
+    <optional>true</optional>
+</dependency>
+----
+
+Dependency này sẽ chứa tất cả những thư viện cần thiết cho việc giao tiếp với minio
+
+.Định nghĩa cấu hình hỗ trợ connect tới minio
+[source, java]
+----
+
+@ConfigurationProperties("spring.minio")
+public class MinioConfigurationProperties {
+    /**
+     * URL kết nối tới Minio instance.
+     */
+    private String url = "https://play.min.io";
+
+    /**
+     * Access key (login)
+     */
+    private String accessKey = "";
+
+    /**
+     * Secret key (password)
+     */
+    private String secretKey = "";
+
+    /**
+     * Nếu URL không có chỉ rõ là http hay https thì cấu hình mặc định là https hay không
+     */
+    private boolean secure = false;
+
+    /**
+     * Bucket name cho application. Tên bucket phải tồn tai trên minio
+     */
+    private String bucket;
+
+    /**
+     * connect timeout
+     */
+    private Duration connectTimeout = Duration.ofSeconds(10);
+
+    /**
+     * write timeout
+     */
+    private Duration writeTimeout = Duration.ofSeconds(60);
+
+    /**
+     * read timeout
+     */
+    private Duration readTimeout = Duration.ofSeconds(10);
+
+    /**
+     * Cấu hình này cho phép hoặc không cho phép việc check bucket name có tồn tại trên minio khi start ứng dụng hay không
+     */
+    private boolean checkBucket = true;
+
+    /**
+     * Thực hiện tạo bucket nếu nó không tồn tại
+     */
+    private boolean createBucket = true;
+}
+----
+
+.Cấu hình các bean cần thiết
+[source, java]
+----
+
+@Configuration
+@EnableConfigurationProperties(MinioConfigurationProperties.class)
+public class MinioConfiguration {
+    @Autowired
+    private MinioConfigurationProperties minioConfigurationProperties;
+
+    @Bean
+    public MinioClient minioClient() {
+
+        MinioClient minioClient;
+        if (!configuredProxy()) {
+            minioClient = MinioClient.builder()
+                    .endpoint(minioConfigurationProperties.getUrl())
+                    .credentials(minioConfigurationProperties.getAccessKey(), minioConfigurationProperties.getSecretKey())
+                    .build();
+        } else {
+            minioClient = MinioClient.builder()
+                    .endpoint(minioConfigurationProperties.getUrl())
+                    .credentials(minioConfigurationProperties.getAccessKey(), minioConfigurationProperties.getSecretKey())
+                    .httpClient(client())
+                    .build();
+        }
+        minioClient.setTimeout(
+                minioConfigurationProperties.getConnectTimeout().toMillis(),
+                minioConfigurationProperties.getWriteTimeout().toMillis(),
+                minioConfigurationProperties.getReadTimeout().toMillis()
+        );
+
+        if (minioConfigurationProperties.isCheckBucket()) {
+            try {
+                LOGGER.debug("Checking if bucket {} exists", minioConfigurationProperties.getBucket());
+                BucketExistsArgs existsArgs = BucketExistsArgs.builder()
+                        .bucket(minioConfigurationProperties.getBucket())
+                        .build();
+                boolean b = minioClient.bucketExists(existsArgs);
+                if (!b) {
+                    if (minioConfigurationProperties.isCreateBucket()) {
+                        try {
+                            MakeBucketArgs makeBucketArgs = MakeBucketArgs.builder()
+                                    .bucket(minioConfigurationProperties.getBucket())
+                                    .build();
+                            minioClient.makeBucket(makeBucketArgs);
+                        } catch (Exception e) {
+                            throw new MinioException("Cannot create bucket", e);
+                        }
+                    } else {
+                        throw new IllegalStateException("Bucket does not exist: " + minioConfigurationProperties.getBucket());
+                    }
+                }
+            } catch (Exception e) {
+                LOGGER.error("Error while checking bucket", e);
+                throw e;
+            }
+        }
+
+        return minioClient;
+    }
+
+}
+----
+
+.Thêm health check actuator tới minio
+[source, java]
+----
+@Component
+public class MinioHealthIndicator implements HealthIndicator {
+
+    private final MinioClient minioClient;
+    private final MinioConfigurationProperties minioConfigurationProperties;
+
+    @Autowired
+    public MinioHealthIndicator(MinioClient minioClient, MinioConfigurationProperties minioConfigurationProperties) {
+        this.minioClient = minioClient;
+        this.minioConfigurationProperties = minioConfigurationProperties;
+    }
+
+
+    @Override
+    public Health health() {
+        if (minioClient == null) {
+            return Health.down().build();
+        }
+
+        try {
+            BucketExistsArgs args = BucketExistsArgs.builder()
+                    .bucket(minioConfigurationProperties.getBucket())
+                    .build();
+            if (minioClient.bucketExists(args)) {
+                return Health.up()
+                        .withDetail("bucketName", minioConfigurationProperties.getBucket())
+                        .build();
+            } else {
+                return Health.down()
+                        .withDetail("bucketName", minioConfigurationProperties.getBucket())
+                        .build();
+            }
+        } catch (Exception e) {
+            return Health.down(e)
+                    .withDetail("bucketName", minioConfigurationProperties.getBucket())
+                    .build();
+        }
+    }
+}
+----
+=== Các thao tác với minio
+.Định nghĩa `MinioService` để thực hiện các thao tác với minio
+
+.Các hàm thực hiện Upload file
+[source, java]
+----
+  public void upload(Path source, InputStream file, Map<String, String> headers) throws
+        MinioException {
+        try {
+            PutObjectArgs args = PutObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(source.toString())
+                    .stream(file, file.available(), -1)
+                    .headers(headers)
+                    .build();
+            minioClient.putObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+
+    public void upload(Path source, InputStream file) throws
+        MinioException {
+        try {
+            PutObjectArgs args = PutObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(source.toString())
+                    .stream(file, file.available(), -1)
+                    .build();
+            minioClient.putObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+    public void upload(Path source, InputStream file, String contentType, Map<String, String> headers) throws
+        MinioException {
+        try {
+            PutObjectArgs args = PutObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(source.toString())
+                    .stream(file, file.available(), -1)
+                    .headers(headers)
+                    .contentType(contentType)
+                    .build();
+
+            minioClient.putObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+    public void upload(Path source, InputStream file, String contentType) throws
+        MinioException {
+        try {
+            PutObjectArgs args = PutObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(source.toString())
+                    .stream(file, file.available(), -1)
+                    .contentType(contentType)
+                    .build();
+
+            minioClient.putObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+    public void upload(Path source, File file) throws
+            MinioException {
+        try {
+            UploadObjectArgs args = UploadObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(source.toString())
+                    .filename(file.getAbsolutePath())
+                    .build();
+            minioClient.uploadObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+----
+.List danh sách tất cả các object từ root bucket
+[source, java]
+----
+  public List<Item> list() {
+        ListObjectsArgs args = ListObjectsArgs.builder()
+                .bucket(configurationProperties.getBucket())
+                .prefix("")
+                .recursive(false)
+                .build();
+        Iterable<Result<Item>> myObjects = minioClient.listObjects(args);
+        return getItems(myObjects);
+  }
+
+  private List<Item> getItems(Iterable<Result<Item>> myObjects) {
+        return StreamSupport
+            .stream(myObjects.spliterator(), true)
+            .map(itemResult -> {
+                try {
+                    return itemResult.get();
+                } catch (Exception e) {
+                    throw new MinioFetchException("Error while parsing list of objects", e);
+                }
+            })
+            .collect(Collectors.toList());
+  }
+
+----
+.List danh sách bucket với prefix
+[source, java]
+----
+    public List<Item> list(Path path) {
+        ListObjectsArgs args = ListObjectsArgs.builder()
+                .bucket(configurationProperties.getBucket())
+                .prefix(path.toString())
+                .recursive(false)
+                .build();
+        Iterable<Result<Item>> myObjects = minioClient.listObjects(args);
+        return getItems(myObjects);
+    }
+----
+.Get Object từ minio
+[source, java]
+----
+public InputStream get(Path path) throws MinioException {
+        try {
+            GetObjectArgs args = GetObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(path.toString())
+                    .build();
+            return minioClient.getObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+----
+.Get metadat của một object
+[source, java]
+----
+public StatObjectResponse getMetadata(Path path) throws MinioException {
+        try {
+            StatObjectArgs args = StatObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(path.toString())
+                    .build();
+            return minioClient.statObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+----
+.Get danh sách metadata của một list object
+[source, java]
+----
+    public Map<Path, StatObjectResponse> getMetadata(Iterable<Path> paths) {
+        return StreamSupport.stream(paths.spliterator(), false)
+            .map(path -> {
+                try {
+                    StatObjectArgs args = StatObjectArgs.builder()
+                            .bucket(configurationProperties.getBucket())
+                            .object(path.toString())
+                            .build();
+                    return new HashMap.SimpleEntry<>(path, minioClient.statObject(args));
+                } catch (Exception e) {
+                    throw new MinioFetchException("Error while parsing list of objects", e);
+                }
+            })
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+    }
+----
+.Xóa object trên minio
+[source, java]
+----
+    public void remove(Path source) throws MinioException {
+        try {
+            RemoveObjectArgs args = RemoveObjectArgs.builder()
+                    .bucket(configurationProperties.getBucket())
+                    .object(source.toString())
+                    .build();
+            minioClient.removeObject(args);
+        } catch (Exception e) {
+            throw new MinioException("Error while fetching files in Minio", e);
+        }
+    }
+----

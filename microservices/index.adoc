@@ -1,0 +1,2352 @@
+:doctype: book
+:navtitle: Tài liệu hướng dẫn Microservice Platform
+:description: Tài liệu hướng dẫn Microservice Platform.
+:chapter-signifier: Phần
+:toc: left
+:toc-title: Mục Lục
+:numbered:
+:toclevels: 3
+:sectnums:
+:partnums:
+
+//:source-highlighter: highlightjs
+//:highlightjs-theme: darkula
+:icons: font
+:imagesdir: images
+:sectanchors:
+:linkattrs:
+:docinfo: shared,private
+
+= Microservice
+
+== Mở đầu
+Sự phát triển của microservices là một tiến bộ đáng kể trong phát triển ứng dụng và triển khai. Với microservices, một ứng dụng được phát triển, hoặc được tái cấu trúc thành các services riêng biệt “nói chuyện” với nhau theo cách được xác định rõ ràng – thông qua các API. Mỗi microservice được tổ chức độc lập, có database riêng của nó (điều này có ý nghĩa rất quan trọng), và có thể được update độc lập với những service khác.
+
+Việc chuyển sang microservices sẽ giúp việc phát triển ứng dụng nhanh hơn và dễ quản lý hơn, yêu cầu ít nhân lực hơn để triển khai nhiều tính năng mới hơn. Các thay đổi có thể được thực hiện và triển khai nhanh hơn và dễ dàng hơn. Ứng dụng được thiết kế như một tập các microservices dễ dàng chạy trên nhiều máy chủ với cân bằng tải (load balancing), giúp dễ dàng xử lý các yêu cầu tăng đột biến và nhu cầu tăng theo thời gian, đồng thời giảm thời gian chết (downtime) do các vấn đề về phần cứng hoặc phần mềm.
+
+Microservices là một phần quan trọng trong các tiến bộ đang thay đổi cách chúng ta làm việc ngày nay. Các kỹ thuật Agile software development, chuyển các ứng dụng lên cloud, văn hóa DevOps, tích hợp liên tục và triển khai liên tục (CI / CD), và việc sử dụng containers đều được sử dụng cùng với microservices để tạo nên cuộc cách mạng hóa trong phát triển và phân phối ứng dụng
+
+Trong phần đầu của tài liệu này sẽ mô tả các khía cạnh chính của microservices trong thiết kế và phát triển ứng dụng, bao gồm cả việc chuyển từ ứng dụng monolithic sang microservices.
+
+Nội dung chính trong phần lý thuyết bao gồm:
+
+. <<introduce>>: Giới thiệu rõ ràng và đơn giản về microservices, từ khái niệm đến thực tế cách các microservices được triển khai và duy trì
+. <<apigateway>>: Là điểm đầu vào duy nhất cho toàn bộ ứng dụng dựa trên microservices
+. <<ipc>>: Một khi bạn tách một ứng dụng nguyên khối thành từng phần riêng biệt – các microservices – khi đó các service cần nói chuyện với nhau. Và có nhiều lựa chọn giao tiếp giữa các process, điển hình như REST.
+. <<servicediscovery>>: Khi các service đang chạy trong một môi trường động, việc tìm kiếm chúng khi cần không phải là vấn đề đơn giản.
+. <<eventsourcing>>: Thay vì chia sẻ một database toàn cục (hoặc hai) trên một ứng dụng nguyên khối, mỗi microservice sẽ tự biểu diễn và lưu trữ dữ liệu riêng của nó. Điều này mang đến sự linh hoạt tuyệt vời, nhưng cũng có thể gây ra sự phức tạp.
+. <<deploymentstrategy>>: Trong thế giới DevOps, cách bạn làm mọi thứ cũng quan trọng như những gì bạn đặt ra để làm ngay từ đầu. Chris mô tả những patterns chính cho việc triển khai microservices để có thể đưa ra lựa chọn sáng suốt cho bạn
+. <<mono2micro>>: Trong một thế giới hoàn hảo, chúng ta sẽ luôn có được thời gian và tiền bạc để thay đổi, cập nhật phần mềm với các công nghệ, công cụ và phương pháp mới nhất và tốt nhất
+
+== Từ thiết kế đến triển khai
+[#introduce]
+=== Tổng quan Microservice
+Microservices hiện đang nhận được rất nhiều sự chú ý: rất nhiều bài viết, blog, thảo luận trên phương tiện truyền thông xã hội và thuyết trình hội nghị. Đồng thời, cũng có những hoài nghi trong cộng đồng phần mềm nhằm bác bỏ microservices. Naysayers cho rằng ý tưởng chỉ là một biến thể của SOA. Tuy nhiên, mặc dù vậy, https://microservices.io/patterns/microservices.html[kiến trúc Microservices] có những lợi ích đáng kể – đặc biệt khi nói đến việc phát triển nhanh và release các ứng dụng doanh nghiệp phức tạp.
+
+Trong phần này chúng ta sẽ tìm hiểu về cách tiếp cận và so sánh với mô hình Kiến trúc nguyên khối truyền thống. Mô tả các yếu tố khác nhau của một kiến trúc microservices. Tìm hiểu về lợi ích và hạn chế của mô hình Kiến trúc Microservices.
+
+Trước hết hãy xem xét lý do tại sao bạn nên xem xét sử dụng microservices
+
+==== Kiến trúc nguyên khối (Monolithic Architechture)
+
+Hãy tưởng tượng rằng bạn đang bắt đầu xây dựng một ứng dụng taxi mới toanh có thương hiệu để cạnh tranh với Uber và Hailo. Sau một số cuộc họp sơ bộ và các yêu cầu thu thập, bạn sẽ tạo một dự án mới từ đầu hoặc bằng cách sử dụng Rails, Spring Boot, Play hoặc Maven. Ứng dụng mới này sẽ có kiến trúc lục giác (hexagonal architecture) kiểu mô-đun, như trong diagram sau:
+
+image::monolithic-architechture.png[]
+
+Core ứng dụng là business logic, được thực hiện bởi các mô-đun có các services, domain objects, and events. Xung quanh lõi là các adapters giao tiếp với thế giới bên ngoài. Ví dụ về *adapters* bao gồm các database access components, messaging components produce và consume các messages, và các web components cung cấp các API hoặc hiển thị giao diện người dùng.
+
+Mặc dù có một kiến trúc mô-đun hợp lý, *ứng dụng được đóng gói và triển khai như một khối nguyên khối*. Định dạng thực tế phụ thuộc vào ngôn ngữ và khuôn khổ của ứng dụng. Ví dụ, nhiều ứng dụng Java được đóng gói như các tệp tin WAR và được triển khai trên các máy chủ ứng dụng như Tomcat hoặc Jetty. Các ứng dụng Java khác được đóng gói như các executable JARs.
+
+Các ứng dụng được viết theo phong cách này là cực kỳ phổ biến. Chúng *đơn giản* để phát triển vì IDE của chúng ta và các công cụ khác tập trung vào việc xây dựng một ứng dụng đơn lẻ. Các loại ứng dụng này cũng đơn giản để test. Bạn có thể thực hiện end-to-end testing bằng cách đơn giản khởi chạy ứng dụng và kiểm tra giao diện người dùng bằng Selenium. Các ứng dụng nguyên khối cũng đơn giản để triển khai. Bạn chỉ cần copy ứng dụng đã được build, đóng gói vào máy chủ. Bạn cũng có thể scale ứng dụng bằng cách chạy nhiều bản sao với load balancer. *Trong giai đoạn đầu của dự án, nó hoạt động tốt.*
+
+==== Địa ngục Monolithic
+Thật không may, cách tiếp cận đơn giản này có một giới hạn rất lớn. Các ứng dụng thành công có thói quen phát triển theo thời gian và cuối cùng trở nên *rất lớn*. Trong mỗi lần chạy nước rút, nhóm phát triển của bạn thực hiện thêm một vài user stories, điều đó, tất nhiên, có nghĩa là thêm nhiều dòng code. Sau một vài năm, ứng dụng nhỏ, đơn giản của bạn sẽ phát triển thành một khối đá khổng lồ. Để đưa ra một ví dụ cực đoan, gần đây tôi đã nói chuyện với một developer đang viết một công cụ để phân tích sự phụ thuộc giữa hàng nghìn gói JAR trong ứng dụng có *hàng triệu dòng code* (LOC) của họ.
+
+Một khi ứng dụng của bạn đã trở thành một khối lớn, phức tạp, công việc phát triển phần mềm của bạn có lẽ là trong *một thế giới của đau khổ*. Bất kỳ nỗ lực phát triển nhanh và giao hàng sẽ không còn dễ dàng. Một vấn đề lớn là ứng dụng *quá phức tạp*. Nó chỉ đơn giản là quá lớn đối với bất kỳ developer nào để hiểu đầy đủ. Kết quả là, *sửa lỗi và triển khai các tính năng mới một cách chính xác sẽ trở nên khó khăn và tốn thời gian*. Hơn nữa, điều này tạo ra một vòng xoáy cực độ. Nếu codebase khó hiểu thì các thay đổi sẽ không được thực hiện chính xác. Bạn sẽ kết thúc với *một quả bóng bùn khổng lồ* (big ball of mud), không thể hiểu nổi, không thể cứu vãn.
+
+Kích thước của ứng dụng cũng sẽ làm *chậm* sự phát triển. Ứng dụng càng lớn thì thời gian khởi động càng dài. Ví dụ: trong một khảo sát gần đây, một số developer đã báo cáo thời gian khởi động là 12 phút. Tôi cũng đã nghe những giai thoại của các ứng dụng mất tới 40 phút để khởi động. Nếu các developer thường xuyên phải khởi động lại máy chủ ứng dụng, thì một phần lớn trong ngày của họ sẽ chỉ là ngồi chờ đợi xung quanh và năng suất của họ sẽ bị ảnh hưởng.
+
+Một vấn đề khác với một ứng dụng nguyên khối phức tạp là sẽ gây trở ngại cho việc triển khai liên tục (continuous deployment). Ngày nay, với các ứng dụng SaaS, chúng thường được push những thay đổi vào production nhiều lần trong ngày. Điều này cực kỳ khó thực hiện với một khối nguyên khối phức tạp vì bạn phải triển khai lại toàn bộ ứng dụng để cập nhật bất kỳ phần nào của nó. Thời gian khởi động kéo dài mà tôi đã đề cập trước đó cũng không giúp được gì. Ngoài ra, vì tác động của thay đổi thường không được hiểu rõ, có khả năng bạn phải thực hiện *manual testing trên diện rộng* (regression test). Do đó, việc triển khai liên tục là không thể thực hiện được.
+
+Các ứng dụng nguyên khối cũng có thể khó mở rộng khi** các mô-đun khác nhau có các yêu cầu xung đột về tài nguyên**. Ví dụ, một mô-đun có thể triển khai logic xử lý hình ảnh chuyên sâu của CPU và lý tưởng nhất sẽ được triển khai trong các instance của Amazon EC2 Compute Optimized. Một mô-đun khác có thể là một cơ sở dữ liệu trong bộ nhớ và phù hợp nhất với các instance EC2 Memory-optimized. Tuy nhiên, vì các mô-đun này được triển khai cùng nhau, bạn phải thỏa hiệp về lựa chọn phần cứng.
+
+Một vấn đề khác với các ứng dụng nguyên khối là *độ tin cậy*. Bởi vì tất cả các mô-đun đang chạy trong cùng một process, một lỗi trong bất kỳ mô-đun nào, chẳng hạn như rò rỉ bộ nhớ, có khả năng có thể làm down toàn bộ process. Hơn nữa, vì tất cả các trường hợp của ứng dụng đều giống hệt nhau, lỗi đó sẽ *ảnh hưởng đến tính khả dụng* của toàn bộ ứng dụng.
+
+Cuối cùng nhưng không kém phần quan trọng, các ứng dụng nguyên khối làm cho việc áp dụng các frameworks and languages mới trở nên *vô cùng khó khăn*. Ví dụ, hãy tưởng tượng rằng bạn có 2 triệu dòng mã được viết bằng cách sử dụng framework XYZ. Nó sẽ cực kỳ tốn kém (cả về thời gian và chi phí) để viết lại toàn bộ ứng dụng để sử dụng framework ABC mới hơn, ngay cả khi framework đó tốt hơn đáng kể. Kết quả là, *có một rào cản lớn đối với việc áp dụng các công nghệ mới*. Bạn đang mắc kẹt với bất kỳ lựa chọn công nghệ nào bạn đã thực hiện khi bắt đầu dự án.
+
+[NOTE]
+_Tóm lại: bạn có một ứng dụng đã phát triển thành một khối khổng lồ mà ở đó rất ít các developer hiểu được. Nó được viết bằng cách sử dụng công nghệ lạc hậu và kém hiệu quả. Điều này cũng khiến cho việc thuê developer có năng lực trở nên khó khăn. Ngoài ra các ứng dụng kiểu này khó mở rộng và không đáng tin cậy. Kết quả là việc phát triển nhanh và phân phối các ứng dụng là không thể_.
+
+Vậy bạn có thể làm gì với nó?
+
+==== Microservice - Giải quyết sự phức tạp
+
+Nhiều tổ chức, như Amazon, eBay và Netflix , đã giải quyết vấn đề này bằng cách áp dụng những gì bây giờ được gọi là https://microservices.io/patterns/microservices.html[Microservices Architecture Pattern]. Thay vì xây dựng một ứng dụng đơn khối, ý tưởng là chia ứng dụng của bạn thành *một tập hợp các services kết nối nhỏ hơn*.
+
+*Một service thường thực hiện một tập hợp các tính năng hoặc chức năng riêng biệt*, chẳng hạn như quản lý đơn hàng, quản lý khách hàng, v.v … Mỗi microservice là một ứng dụng nhỏ có cấu trúc lục giác (hexagonal architecture) riêng bao gồm logic nghiệp vụ cùng với các adapters khác nhau. Một số microservice sẽ cung cấp API được sử dụng bởi các microservices khác hoặc bởi các ứng dụng của khách hàng. Một số Microservices khác có thể triển khai giao diện người dùng web. Khi chạy, mỗi instance thường là một cloud VM or a Docker container.
+
+Ví dụ, hệ thống được *decomposite* thành các microservices được mô tả trước đó được thể hiện trong diagram sau:
+
+image::microservice-architechture.png[]
+
+Mỗi nhóm chức năng của ứng dụng hiện được thực hiện bởi microservice riêng của nó. Hơn nữa, các ứng dụng web được chia thành một tập hợp các ứng dụng web đơn giản hơn (ví dụ như một cho hành khách và một cho các trình điều khiển trong ví dụ taxi của chúng ta). Điều này giúp dễ dàng triển khai trải nghiệm khác biệt cho người dùng cụ thể, thiết bị hoặc trường hợp sử dụng chuyên biệt.
+
+Mỗi service phụ trợ cho thấy các *REST API* và hầu hết các service đều consume các API do các service khác cung cấp. Ví dụ: Driver Management sử dụng Notification server để cho tài xế đang rảnh biết về chuyến đi tiềm năng. Các service UI gọi các service khác để hiển thị các trang web. Các service cũng có thể sử dụng giao tiếp không đồng bộ, dựa trên thông điệp (*message-based communication*).
+
+Một số API REST cũng được tiếp xúc với các ứng dụng dành cho thiết bị di động dành cho tài xế và hành khách. Tuy nhiên, các ứng dụng không có quyền truy cập trực tiếp vào các service phụ trợ. Thay vào đó, giao tiếp được trung gian bởi một thành phần trung gian được gọi là API Gateway. API Gateway chịu trách nhiệm về các nhiệm vụ như cân bằng tải, bộ nhớ đệm, kiểm soát truy cập, đo lường API và monitoring.
+
+image::scale_cube.png[]
+
+Mẫu Kiến trúc Microservices tương ứng với tỷ lệ *trục Y* của Scale Cubefootnote:[https://microservices.io/articles/scalecube.html], là mô hình 3D có khả năng mở rộng từ cuốn sách tuyệt vời có tên http://theartofscalability.com/[**_The Art of Scalability_**]. Hai trục tỷ lệ khác là chia tỷ lệ trục X, bao gồm chạy nhiều bản sao giống hệt nhau của ứng dụng phía sau bộ cân bằng tải và chia tỷ lệ trục Z (hoặc phân vùng dữ liệu), trong đó thuộc tính của yêu cầu (ví dụ, khóa chính của một hàng hoặc danh tính của một khách hàng) được sử dụng để định tuyến yêu cầu tới một máy chủ cụ thể.
+
+Các ứng dụng thường sử dụng ba loại chia tỷ lệ với nhau. Trục Y chia tỷ lệ decomposes các ứng dụng thành microservices như được hiển thị ở trên trong hình đầu tiên trong phần này. Khi chạy, quy mô trục X sẽ chạy nhiều instances của từng service phía sau bộ cân bằng tải cho thông lượng và tính khả dụng. Một số ứng dụng cũng có thể sử dụng chia tỷ lệ trục Z để phân vùng service. Diagram sau đây cho thấy Trip Management service có thể được triển khai với Docker chạy trên Amazon EC2 như thế nào.
+
+image::deploy_amazon_ec2.png[]
+
+Khi chạy, Trip Management service bao gồm nhiều service instances. Mỗi service instance là một Docker container. Để có tính sẵn sàng cao, các containers đang chạy trên nhiều Cloud VMs. Ở phía trước của các service instances là một bộ cân bằng tải phân phối các yêu cầu trên các cá thể. Trình cân bằng tải cũng có thể xử lý các mối quan tâm khác như caching, access control, API metering, and monitoring.
+
+Mô hình Microservices tác động đáng kể đến mối quan hệ giữa ứng dụng và cơ sở dữ liệu. *Thay vì chia sẻ một lược đồ cơ sở dữ liệu duy nhất với các service khác, mỗi service có lược đồ cơ sở dữ liệu riêng của nó*. Một mặt, cách tiếp cận này là mâu thuẫn với ý tưởng của một mô hình dữ liệu toàn doanh nghiệp. Ngoài ra, nó thường dẫn đến trùng lặp một số dữ liệu. Tuy nhiên, có một lược đồ cơ sở dữ liệu cho mỗi service là điều cần thiết nếu bạn muốn hưởng lợi từ microservices, bởi vì nó đảm bảo các khớp nối lỏng lẻo (loose coupling). Diagram sau đây cho thấy database architecture cho ứng dụng ví dụ:
+
+image::database_per_service.png[]
+Mỗi service đều có cơ sở dữ liệu riêng. Hơn nữa, một service có thể sử dụng một loại cơ sở dữ liệu phù hợp nhất với nhu cầu của nó, cái gọi là kiến trúc bền bỉ đa điểm (polyglot persistence architecture). Ví dụ: Driver Management cần tìm tài xết gần với hành khách tiềm năng, phải sử dụng cơ sở dữ liệu hỗ trợ truy vấn địa lý hiệu quả.
+
+Nhìn bề ngoài, mô hình Microservices tương tự như SOA. Với cả hai cách tiếp cận, kiến trúc bao gồm một tập hợp các service. Tuy nhiên, *có thể coi Microservices như là SOA* nhưng *không có sự thương mại hóa và dấu hiệu nhận biết về các đặc tả service web (WS-**) và Service Service Bus (ESB)*. Các ứng dụng dựa trên microservice có các giao thức đơn giản, nhẹ hơn như REST, chứ không phải WS-*. Microservices cũng rất *tránh sử dụng ESB* và thay vào đó thực hiện chức năng giống như ESB trong bản thân microservices. Mô hình Microservices cũng loại bỏ các phần khác của SOA, chẳng hạn như khái niệm lược đồ chuẩn (canonical schema).
+
+==== Lợi ích sử dụng microservice
+Mô hình Kiến trúc Microservices có một số lợi ích quan trọng. Đầu tiên, nó *giải quyết vấn đề phức tạp*. Decompose một ứng dụng nguyên khối khổng lồ thành một tập hợp các service. Mặc dù tổng số chức năng không thay đổi, ứng dụng đã được chia thành các phần hoặc service có thể quản lý. Mỗi service có một ranh giới được xác định rõ ràng dưới dạng một API RPC hoặc message‑driven API. Mô hình Microservices thực thi một mức mô đun mà trong thực tế là cực kỳ khó khăn để đạt được với monolithic code base. Do đó, các service riêng lẻ được sẽ phát triển nhanh hơn, dễ hiểu và dễ bảo trì hơn nhiều.
+
+Thứ hai, kiến trúc này cho phép *mỗi service được phát triển độc lập bởi một nhóm tập trung vào service đó*. Các developer được tự do lựa chọn bất kỳ công nghệ nào có ý nghĩa, miễn là service này tôn trọng các API contract. Tất nhiên, hầu hết các tổ chức sẽ muốn tránh tình trạng hỗn loạn và giới hạn các tùy chọn công nghệ. Tuy nhiên, quyền tự do này có nghĩa là các developer không còn bị bắt buộc phải sử dụng các công nghệ có thể đã lỗi thời tồn tại khi bắt đầu một dự án mới. Khi viết một service mới, họ có tùy chọn sử dụng công nghệ hiện tại. Hơn nữa, vì các service tương đối nhỏ nên nó trở nên khả thi để viết lại một service cũ sử dụng công nghệ hiện tại.
+
+Thứ ba, mô hình Microservices cho phép *mỗi microservice được triển khai độc lập*. Các developer không bao giờ cần phải phối hợp triển khai các thay đổi cục bộ với service của họ. Những loại thay đổi này có thể được triển khai ngay khi chúng được kiểm tra. Ví dụ, nhóm UI có thể thực hiện A/B testing và lặp lại nhanh chóng trên các thay đổi giao diện người dùng. Mô hình Microservices giúp triển khai liên tục (continuous deployment) trở nên khả thi.
+
+Cuối cùng, mô hình Microservices cho phép *mỗi service được mở rộng (scale) một cách độc lập*. Bạn có thể triển khai số lượng instance của từng service đáp ứng nhu cầu và khả năng sẵn có của nó. Hơn nữa, bạn có thể sử dụng phần cứng phù hợp nhất với yêu cầu tài nguyên của một service. Ví dụ, bạn có thể triển khai một service xử lý ảnh chuyên sâu của CPU trên các instance EC2 Compute Optimized, và triển khai service cơ sở dữ liệu bộ nhớ trong trên các instance EC2 Memory-optimized.
+
+==== Những hạn chế của Microservice
+Như Fred Brooks đã viết gần 30 năm trước, không có viên đạn bạc (*there are no silver bullets*). Giống như mọi công nghệ khác, kiến trúc Microservices cũng có nhược điểm. Một nhược điểm là tên của chính nó. Thuật ngữ microservice đặt trọng tâm quá mức vào kích thước service. Trên thực tế, có một số developer, những người ủng hộ việc xây dựng các service chỉ có 10–100 LOC. Tuy nhiên, mục tiêu của microservices là decompose đầy đủ ứng dụng để tạo điều kiện phát triển và triển khai ứng dụng nhanh nhẹn.
+
+Một nhược điểm lớn khác của microservices là sự phức tạp phát sinh từ thực tế là một ứng dụng microservices là một hệ thống phân tán. Các developer cần phải lựa chọn và thực hiện một cơ chế giao tiếp giữa các process dựa trên *messaging hoặc RPC*. Hơn nữa, họ cũng phải viết mã để xử lý việc thất bại giữa chừng (*partial failure*) vì điểm đến của request có thể chậm hoặc không khả dụng. Rõ ràng là nó phức tạp hơn nhiều so với trong một ứng dụng nguyên khối nơi các mô-đun gọi nhau thông qua các cuộc gọi phương thức / thủ tục mức ngôn ngữ.
+
+Một thách thức khác với microservices là kiến trúc cơ sở dữ liệu phân vùng (*partitioned database architecture*). Các business transactions cập nhật nhiều business entities là điều khá phổ biến. Các loại transaction này thường được thực hiện khá dễ dàng trong một ứng dụng nguyên khối vì chỉ có một cơ sở dữ liệu duy nhất. Tuy nhiên, trong một ứng dụng dựa trên microservices, bạn cần cập nhật nhiều cơ sở dữ liệu thuộc sở hữu của các service khác nhau. Sử dụng các *distributed transactions* thường không phải là một lựa chọn, và không chỉ vì định lý CAP. Đơn giản là sự toàn vẹn về cơ sở dữ liệu không được hỗ trợ bởi các dạng cơ sở dữ liệu như NoSQL (có khả năng mở rộng cao) và các messaging brokers. Chúng ta cuối cùng phải sử dụng một phương pháp tiếp cận dựa trên sự nhất quán cuối cùng (*eventual consistency*), điều này cũng gây không tí khó khăn cho các developer.
+
+*Test một ứng dụng microservices cũng phức tạp hơn nhiều*. Ví dụ, với một framework hiện đại như Spring Boot, rất đơn giản để viết một lớp thử nghiệm khởi động một ứng dụng web nguyên khối và kiểm tra API REST của nó. Ngược lại, một lớp thử nghiệm tương tự cho một service sẽ cần phải khởi chạy service đó và bất kỳ service nào mà nó phụ thuộc (hoặc ít nhất là cấu hình các stubs cho các service đó). Một lần nữa là không đánh giá thấp sự phức tạp của việc này.
+
+Một thách thức lớn khác với mô hình Microservices là thực hiện *các thay đổi trải rộng trên nhiều service*. Ví dụ, hãy tưởng tượng rằng bạn đang thực hiện câu chuyện yêu cầu thay đổi đối với service A, B và C, trong đó A phụ thuộc vào B và B phụ thuộc vào C. Trong ứng dụng nguyên khối, bạn có thể thay đổi mô-đun tương ứng, tích hợp các thay đổi, và triển khai chúng trong một lần. Ngược lại, trong Microservices, bạn cần phải lập kế hoạch và điều phối cẩn thận việc triển khai các thay đổi cho từng service. Ví dụ, bạn sẽ cần cập nhật service C, tiếp theo là service B, và cuối cùng là service A. May thay, hầu hết các thay đổi thường chỉ tác động đến một service và các thay đổi service đa yêu cầu phối hợp tương đối hiếm.
+
+*Triển khai một ứng dụng dựa trên microservices cũng phức tạp hơn nhiều*. Một ứng dụng nguyên khối được triển khai đơn giản trên một tập hợp các máy chủ giống hệt nhau phía sau bộ cân bằng tải truyền thống. Mỗi cá thể ứng dụng được cấu hình với các vị trí (host and ports) của các service cơ sở hạ tầng như cơ sở dữ liệu và message broker. Ngược lại, một ứng dụng microservice thường bao gồm một số lượng lớn các service. Ví dụ, Hailo có 160 service khác nhau và Netflix có hơn 600 service. Mỗi service sẽ có nhiều phiên bản running. Có nhiều bộ phận cần được cấu hình, triển khai, thu nhỏ và giám sát. Ngoài ra, bạn cũng sẽ cần triển khai một cơ chế khám phá service (service discovery) cho phép một service khám phá các vị trí (host and ports) của bất kỳ service nào khác mà nó cần giao tiếp. Các cách tiếp cận thủ công truyền thống dựa trên ticket-based và thủ công không thể mở rộng đến mức độ phức tạp này. Do đó, việc triển khai thành công ứng dụng microservices yêu cầu các developer kiểm soát các phương thức triển khai và mức độ tự động hóa cao hơn.
+
+Một cách tiếp cận để tự động hóa là sử dụng một PaaS như Cloud Foundry . PaaS cung cấp cho các developer một cách dễ dàng để triển khai và quản lý microservices của họ. Nó cách ly chúng khỏi những lo ngại như mua sắm và cấu hình tài nguyên CNTT. Đồng thời, các chuyên gia hệ thống và network cấu hình PaaS có thể đảm bảo tuân thủ các best practices và với các chính sách của công ty. Một cách khác để tự động hóa việc triển khai microservices là phát triển giải pháp PaaS cho riêng bạn. Một điểm khởi đầu điển hình là sử dụng một giải pháp phân cụm (clustering solution), chẳng hạn như Kubernetes, kết hợp với một công nghệ như Docker.
+
+[NOTE]
+_Xây dựng các ứng dụng phức tạp vốn đã khó khăn. Một kiến trúc Monolithic chỉ có ý nghĩa đối với các ứng dụng đơn giản, nhẹ. Bạn sẽ kết thúc trong một thế giới đau đớn nếu bạn sử dụng nó cho các ứng dụng phức tạp. Mô hình kiến trúc Microservices là sự lựa chọn tốt hơn cho các ứng dụng phức tạp, bất chấp những hạn chế và thách thức thực hiện._
+
+[#apigateway]
+=== API Gateway
+Chúng ta đã thảo luận về những lợi ích và hạn chế của việc sử dụng microservices. Microservices tuy phức tạp, nhưng thường là lựa chọn lý tưởng cho các ứng dụng lớn, phức tạp và đòi hỏi sự đáp ứng nhanh.
+
+Khi xây dựng ứng dụng của mình bằng một tập hợp các microservices, bạn cần quyết định cách các application clients sẽ tương tác với microservices như thế nào. Với một ứng dụng nguyên khối, chỉ có một tập hợp các endpoints (có thể được nhân rộng (replicated) và cân bằng tải). Tuy nhiên, trong kiến trúc microservices, mỗi microservice sẽ có tập các endpoints nhỏ của riêng nó.
+
+==== Giới thiệu
+Hãy tưởng tượng rằng bạn đang phát triển một ứng dụng native mobile cho một ứng dụng shopping. Bạn cần làm trang chi tiết sản phẩm hiển thị thông tin về bất kỳ sản phẩm cụ thể nào.
+
+Ví dụ, diagram sau đây cho thấy những gì bạn sẽ thấy trên trang chi tiết sản phẩm trong ứng dụng di động của Amazon.
+
+image::amazon_example.png[]
+
+Mặc dù đây là một ứng dụng mobile, trang chi tiết sản phẩm hiển thị rất nhiều thông tin. Ví dụ: không chỉ có thông tin sản phẩm cơ bản (chẳng hạn như tên, mô tả và giá) nhưng trang này cũng hiển thị:
+
+- Số lượng mặt hàng trong giỏ hàng
+- Lịch sử đơn hàng
+- Phản hồi khách hàng
+- Cảnh báo hàng tồn kho thấp
+- Tùy chọn giao hàng
+- Các đề xuất khác nhau, bao gồm các sản phẩm khác mà sản phẩm này thường xuyên mua, các sản phẩm khác được khách hàng mua sản phẩm này mua và các sản phẩm khác được khách hàng mua sản phẩm này đã xem
+- Tùy chọn mua thay thế
+
+Khi sử dụng kiến trúc nguyên khối, một ứng dụng mobile sẽ lấy ra dữ liệu bằng cách thực hiện một REST request (`GET api.company.com/productdetails/productId`) tới ứng dụng. Load balancer sẽ định tuyến request đến một trong N instances giống hệt nhau. Sau đó, instance này sẽ truy vấn các bảng cơ sở dữ liệu khác nhau và response kết quả về cho client.
+
+Ngược lại, khi sử dụng kiến trúc microservices, dữ liệu được hiển thị trên trang chi tiết sản phẩm được thực hiện bởi *nhiều microservices*. Ví dụ dưới đây là một số service microservices có dữ liệu được hiển thị trên trang chi tiết sản phẩm:
+
+- service giỏ hàng (card) – Số lượng mặt hàng trong giỏ hàng
+- service đặt hàng (order) – Lịch sử đặt hàng
+- service danh mục (category) – Thông tin sản phẩm cơ bản, chẳng hạn như tên, hình ảnh và giá của nó
+- service đánh giá (rating) – Nhận xét của khách hàng
+- service kho hàng (inventory) – Cảnh báo hàng tồn kho thấp
+- service giao hàng (shipping) – Tùy chọn giao hàng, thời hạn và chi phí đổi trả riêng biệt với API của nhà cung cấp giao hàng
+- service đề xuất (recommendation) – Các mục được đề xuất
+
+image::how_to_composite.png[]
+
+Chúng ta cần quyết định cách ứng dụng mobile client truy cập đến các service này. Hãy xem xét các tùy chọn sau đây.
+
+==== Client giao tiếp trực tiếp với Microservice
+Về lý thuyết, một client có thể *request trực tiếp đến từng microservice*. Mỗi microservice sẽ có một public endpoint (https://serviceName.api.company.name). URL này sẽ ánh xạ tới load balancer của microservice, phân phối các request trên các instances có sẵn. Để truy xuất chi tiết sản phẩm, ứng dụng mobile client sẽ gửi request đến từng service được liệt kê ở trên.
+
+Tuy nhiên điều này mang đến những thách thức và hạn chế. Một là sự không phù hợp giữa nhu cầu của client và các API chi tiết được cung cấp bởi từng microservice. Client trong ví dụ này phải *thực hiện 7 request riêng biệt*. Trong các ứng dụng phức tạp hơn, nó có thể phải làm nhiều hơn nữa. Ví dụ: Amazon mô tả có hàng trăm service liên quan đến việc hiển thị trang sản phẩm của họ. Một client có thể thực hiện nhiều request qua mạng LAN, tuy nhiên sẽ không hiệu quả trên Internet và chắc chắn sẽ không khả thi trên mạng di động. Cách tiếp cận này cũng làm cho mã nguồn client phức tạp hơn nhiều.
+
+Một vấn đề khác với việc client trực tiếp gọi microservices là một số microservice có thể *sử dụng các giao thức không thân thiện với web*. Một service có thể sử dụng RPC trong khi một service khác có thể sử dụng giao thức AMQP, các protocol đó chỉ phù hợp với các giao tiếp nội bộ. Một ứng dụng nên sử dụng các giao thức như HTTP và WebSocket bên ngoài tường lửa.
+
+Một hạn chế khác với phương pháp này là sẽ gây *khó khăn trong việc tái cấu trúc microservices.* Theo thời gian, chúng ta có thể muốn thay đổi cách hệ thống để phân vùng thành các service. Ví dụ: có thể hợp nhất hai service hoặc chia service thành hai hoặc nhiều service. Tuy nhiên, nếu client giao tiếp trực tiếp với các service, thì việc thực hiện tái cấu trúc này có thể cực kỳ khó khăn.
+
+Vì vấn đề trên nên hiếm khi chúng ta để cho client giao tiếp trực tiếp với các microservices.
+
+==== Sử dụng API Gateway
+Cách tiếp cận tốt hơn là sử dụng API Gateway. API Gateway là một máy chủ và là điểm đầu vào duy nhất của hệ thống. Tương tự như Facade pattern trong object oriented design. API Gateway đóng gói hệ thống nội bộ và cung cấp các API được thiết kế riêng cho từng client. Nó có thể có trách nhiệm khác như xác thực (authentication), giám sát (monitoring), cân bằng tải (load balancing), bộ nhớ đệm (caching), chuyển đổi request (request shaping and management) và xử lý phản hồi tĩnh (static response handling).
+
+Diagram sau đây minh họa về cách áp dụng API Gateway trong hệ thống:
+
+image::api-gateway.png[]
+API Gateway chịu trách nhiệm *định tuyến các request, tổng hợp và chuyển đổi giao thức*. Tất cả các request từ client sẽ đi qua API Gateway trước tiên. Sau đó nó định tuyến các request tới các microservice thích hợp. API Gateway thường xử lý request bằng cách gọi nhiều microservices và tổng hợp kết quả. Nó có thể chuyển đổi giữa các giao thức web như HTTP và WebSocket và cả các giao thức không thân thiện với web.
+
+API Gateway cũng có thể cung cấp cho mỗi client các API tùy chỉnh. Nó thường cho thấy một API tổng hợp (coarse grained) cho các ứng dụng mobile. Hãy xem xét, ví dụ chi tiết sản phẩm. API Gateway có thể cung cấp endpoint (/productdetails?productid=xxx) cho phép ứng dụng mobile client truy xuất tất cả chi tiết sản phẩm bằng một request duy nhất. API Gateway xử lý request bằng cách gọi các service khác nhau – thông tin sản phẩm, đề xuất, đánh giá, v.v. – và kết hợp các kết quả.
+
+Một ví dụ tuyệt vời về API Gateway là API Gateway Netflix. Các service trực tuyến Netflix có trên hàng trăm loại thiết bị khác nhau bao gồm TV, set-top box, điện thoại, hệ thống chơi game, máy tính bảng v.v. Ban đầu, Netflix đã cố gắng để cung cấp một **one-size-fits-all API **cho các service trực tuyến của họ. Tuy nhiên, họ phát hiện ra rằng nó không hoạt động tốt vì sự đa dạng của các thiết bị và nhu cầu riêng của họ. Ngày nay, họ sử dụng API Gateway cung cấp API được điều chỉnh cho từng thiết bị bằng cách chạy các adapter code cụ thể cho thiết bị. Adapter thường xử lý từng request bằng cách gọi trung bình từ 6 đến 7 service khác.
+
+==== Lợi ích và hạn chế của API Gateway
+Việc sử dụng API Gateway có cả lợi ích và nhược điểm. Lợi ích chính của việc sử dụng API Gateway là đóng gói cấu trúc bên trong của ứng dụng. Thay vì phải gọi các service cụ thể, client chỉ cần nói chuyện với Gateway. API Gateway cung cấp cho từng loại client với API cụ thể. Điều này làm giảm số lượng request/response giữa client và hệ thống. Nó cũng giúp đơn giản hóa client code.
+
+API Gateway cũng có một số nhược điểm. Đó là cần phải develope, deploye, and manage một component khác có độ sẵn sàng cao (*highly available*) đảm nhận vai trò API Gateway. Cũng có nguy cơ là API Gateway trở thành nút thắt cổ chai (*bottleneck*). Developer phải cập nhật API Gateway để làm việc với các endpoints của microservice khi có thay đổi. Điều quan trọng là phải làm cho quá trình cập nhật API Gateway càng nhẹ càng tốt. Nếu không, các developer sẽ bị buộc phải xếp hàng để cập nhật API Gateway. Tuy nhiên, mặc dù có những hạn chế này, đối với hầu hết các ứng dụng thực tế, việc sử dụng API Gateway là việc rất hợp lý và cần thiết.
+
+==== Implement API Gateway
+Bây giờ chúng ta đã xem xét một số khía cạnh trong việc triển khai và sử dụng API Gateway, trước tiên hãy xem xét các design issues dưới đây:
+
+===== Hiệu suất và khả năng mở rộng
+Chỉ một số ít các công ty hoạt động ở quy mô của Netflix và cần xử lý hàng tỷ request mỗi ngày. Tuy nhiên, đối với hầu hết các ứng dụng, hiệu năng và khả năng mở rộng của API Gateway cũng thường rất quan trọng. Do đó, để xây dựng API Gateway trên một nền tảng hỗ trợ I/O bất đồng bộ, nonblocking có nhiều công nghệ khác nhau. Trên JVM, bạn có thể sử dụng một trong các frameworks NIO-based như Netty, Vertx, Spring Reactor hoặc JBoss Undertow. Một tùy chọn non-JVM phổ biến là Node.js, một nền tảng được xây dựng trên JavaScript engine của Chrome. Một lựa chọn khác là sử dụng NGINX Plus
+
+===== Sử dụng reactive programming model
+API Gateway xử lý một số request bằng cách định tuyến chúng tới các service thích hợp. Nó xử lý các request bằng cách gọi nhiều service và tổng hợp các kết quả. Để giảm thiểu thời gian phản hồi, API Gateway nên thực hiện đồng thời các request độc lập. Tuy nhiên, đôi khi có sự phụ thuộc giữa các request. API Gateway trước tiên có thể cần phải xác nhận request bằng cách gọi một authentication service trước khi định tuyến request đến một service cụ thể. Tương tự, để fetch thông tin về các sản phẩm trong wish list của khách hàng, trước tiên API Gateway phải truy xuất hồ sơ của khách hàng chứa thông tin đó và sau đó lấy thông tin cho mỗi sản phẩm.
+
+Viết API Gateway bằng cách sử dụng phương pháp asynchronous callback sẽ gây ra callback hell. Code sẽ bị rối, khó hiểu và dễ bị lỗi. Cách tiếp cận tốt hơn là viết API Gateway theo kiểu khai báo bằng cách sử dụng phương thức phản ứng (reactive). Ví dụ về reactive bao gồm Future trong Scala, CompletableFuture trong Java 8 và Promise trong JavaScript. Ngoài ra còn có Reactive Extensions (còn được gọi là Rx hoặc ReactiveX) ban đầu được phát triển bởi Microsoft cho nền tảng .NET. Netflix đã tạo RxJava cho JVM để sử dụng trong API Gateway của họ. Ngoài ra còn có RxJS cho JavaScript, chạy trong cả trình duyệt và Node.js. Cách tiếp cận Reactive sẽ cho phép viết mã API Gateway đơn giản nhưng hiệu quả hơn.
+
+===== Service invocation
+Một ứng dụng dựa trên microservices là một hệ thống phân tán và phải sử dụng cơ chế inter-process communication. Có hai kiểu giao tiếp giữa các process. Một là sử dụng cơ chế dựa trên asynchronous messaging-based sử dụng các message broker như JMS hoặc AMQP. Một số khác, chẳng hạn như Zeromq, không dùng broker mà các services giao tiếp trực tiếp với nhau. Một cách giao tiếp giữa các process khác là cơ chế synchronous như HTTP. Một hệ thống thường sẽ sử dụng cả kiểu asynchronous và synchronous, do đó API Gateway sẽ cần hỗ trợ nhiều cơ chế giao tiếp khác nhau.
+
+===== Service discovery
+API Gateway cần biết vị trí (IP address và port) của từng service mà nó giao tiếp. Trong một ứng dụng truyền thống, các service được cố định vị trí, nhưng trong một ứng dụng microservices hiện đại, dựa trên cloud, đây là một vấn đề nan giải. Các service cơ sở hạ tầng, chẳng hạn như message broker, thường sẽ có một vị trí tĩnh, có thể được xác định thông qua OS environment variables. Tuy nhiên, việc xác định vị trí của một Application services không phải là dễ dàng như vậy. Application services có vị trí được gán động. Ngoài ra, tập hợp các instance của service sẽ thay đổi tự động dựa trên sự tự mở rộng (autoscaling) và nâng cấp (upgrade). Do đó, API Gateway, giống như bất kỳ ứng dụng client nào khác trong hệ thống, cần phải sử dụng cơ chế Service Discovery: Server-Side Discovery hoặc Client-Side Discovery. Cần lưu ý rằng nếu hệ thống sử dụng Client-Side Discovery thì API Gateway phải có khả năng truy vấn đến Service Registry, là cơ sở dữ liệu của tất cả các microservice instances và vị trí của chúng
+
+===== Xử lý lỗi giữa chừng (Partial failures)
+Một vấn đề khác mà chúng ta phải giải quyết khi triển khai API Gateway là vấn đề Partial Failures. Vấn đề này phát sinh trong tất cả các hệ thống phân tán bất cứ khi nào một service gọi một service khác, phản hồi chậm hoặc không có sẵn. API Gateway sẽ không bao giờ đứng chờ một service vô thời hạn. Tuy nhiên, cách xử lý sự cố phụ thuộc vào kịch bản cụ thể và service nào bị lỗi. Ví dụ: nếu recommendation service không phản hồi trong trường hợp lấy về product details, API Gateway sẽ trả lại phần còn lại của product details cho client vì chúng vẫn hữu ích cho client. Phần recommendation có thể trống hoặc được thay thế bằng ví dụ như: danh sách 10 mặt hàng đầu được ưu tiên. Tuy nhiên, nếu product information service không phản hồi thì API Gateway nên trả về lỗi cho client.
+
+API Gateway cũng có thể trả về dữ liệu đã lưu trong bộ nhớ cache nếu có sẵn. Ví dụ, vì giá sản phẩm thay đổi không thường xuyên, API Gateway có thể trả về dữ liệu định giá được lưu trong bộ nhớ cache nếu service định giá không khả dụng. Dữ liệu có thể được lưu trữ bởi chính API Gateway hoặc được lưu trữ trong bộ nhớ đệm bên ngoài như Redis hoặc Memcached. Bằng cách trả về dữ liệu mặc định hoặc dữ liệu được lưu trong bộ nhớ cache, API Gateway đảm bảo rằng các lỗi hệ thống không ảnh hưởng đến trải nghiệm người dùng.
+
+Netflix Hystrix là một thư viện cực kỳ hữu ích để viết mã gọi các remote services. Hystrix tính thời gian gọi vượt quá ngưỡng quy định. Nó dùng circuit breaker pattern để client không phải chờ một cách không cần thiết khi một service không phản hồi. Nếu tỷ lệ lỗi cho một service vượt quá ngưỡng được chỉ định, Hystrix sẽ ngắt mạch và tất cả các request tới service này thất bại ngay lập tức trong một khoảng thời gian nhất định. Hystrix cho phép xác định hành động dự phòng khi request không thành công, chẳng hạn như đọc từ bộ nhớ cache hoặc trả lại giá trị mặc định. Nếu đang sử dụng JVM, bạn chắc chắn nên xem xét sử dụng Hystrix. Và, nếu đang chạy trong một môi trường không JVM, bạn nên sử dụng một thư viện tương đương.
+
+[NOTE]
+_Đối với hầu hết các ứng dụng dựa trên microservices, có lý do consider đến API Gateway, hoạt động như một điểm đầu vào duy nhất của hệ thống. API Gateway chịu trách nhiệm định tuyến các request, tổng hợp và chuyển đổi giao thức. Nó cung cấp cho mỗi client một API tùy chỉnh. API Gateway cũng có các biện pháp xử lý lỗi như thay thế các lỗi trong các service bằng cách trả về dữ liệu cache hoặc mặc định._
+
+[#ipc]
+=== Giao tiếp giữa các service (Inter process communication)
+Trong một ứng dụng đơn khối (monolithic), các components tương tác với nhau thông qua việc truy vấn method và function. Ngược lại, các ứng dụng Microservices là một hệ thống phân tán chạy trên nhiều máy. Mỗi service instance là một quá trình đặc trưng. Do đó, sự tương tác giữa các services cần đến kỹ thuật IPC, viết tắt của inter-process communication: hành động trao đổi dữ liệu giữa các tiến trình riêng biệt, sử dụng giao thức kết nối.
+
+==== Tương tác giữa các service
+Khi lựa chọn kĩ thuật IPC cho một service, ta cần hiểu các services tương tác với nhau như thế nào. Có vô số cách tương tác giữa client-service. Ta có thể chia chúng thành 2 nhóm theo 2 cách:
+
+.Cách 1: tương tác/ kết nối 1-1 hoặc 1-nhiều – gọi tắt là 1-n:
+- 1-1: mỗi request từ client được xử lí bởi 1 service duy nhất
+- 1-nhiều: mỗi request từ client được xử lí bởi nhiều service instance
+
+.Cách 2: kết nối đồng bộ (synchromous) hoặc bất đồng bộ (asynchronous)
+- Với synchronous: clients gửi request rồi chờ phản hồi, trong lúc chờ có thể không chạy tiếp
+- Với asynchronous: clients cũng gửi request rồi chạy tiếp, khi có kết quả (response) thì xử lí
+
+Chúng ta có thể theo dõi tương quan các kiểu kết nối/tương tác qua bảng sau:
+
+|===
+| |1-1 |1-n
+
+|Synchronous
+|Request/response
+|
+
+|Asynchronous
+|
+Thông báo (notification)
+Request/async response
+|Publish/subscribe
+Publish/async responses
+|===
+
+.Với tương tác 1-1, ta có các hình thức:
+- Request/response (yêu cầu/ hồi đáp): client gửi yêu cầu tới service và đợi phản hồi đúng thời điểm. Trong những ứng dụng thread-based. Thread nào đang chạy yêu cầu (request) sẽ bị chiếm dụng trong suốt quá trình đợi phản hồi.
+- Notification (Thông báo): client gửi yêu cầu (request) tới service nhưng không đợi phản hồi và cũng không có phản hồi nào được gửi lại.
+- Request/ async response (yêu cầu – hồi đáp bất đồng bộ): quá trình client gửi yêu cầu tới service và nhận phản hồi diễn ra không đồng thời. Client được thiết kế để hiểu rằng phản hồi sẽ không đến tức thì, do đó, client không bận trong suốt quá trình đợi phản hồi (trái ngược với hình thức request/response)
+
+.Với tương tác 1-n, ta có:
+- Công bố/theo dõi (Publish/subscribe): client bắn ra một tin nhắn/thông báo, các services có ”hứng” với thông báo đó sẽ xâu xé nó.
+- Công bố/ hồi đáp bất đồng bộ (Publish/async responses): client đưa ra yêu cầu (bằng tin nhắn hoặc thông báo) rồi đợi hồi đáp từ các services có “hứng”
+
+Đa phần các service (service) là tổ hợp của 3 phương pháp tương tác. Một tỉ lệ nhỏ chỉ cần một kĩ thuật IPC là đủ. Số còn lại thì cần sự kết hợp các kĩ thuật IPC. Biểu đồ sau cho thấy quá trình tương tác giữa ứng dụng và người dùng khi người dùng đặt một chuyến taxi:
+
+image::book-trip.png[]
+Ta thấy một tổ hợp thông báo (notification) + yêu cầu/hồi đáp (request/response) + công bố/theo dõi (publish/subscribe).
+
+Khách khởi động ứng dụng và thao tác trên smartphone, smartphone gửi 1 notification (thông báo) đến bộ phận quản lý hành trình (Trip Management) để gọi một chuyến taxi. Bộ phận quản lý (Trip Management) truy vấn bộ phận service khách hàng (Passenger Service) thông qua hình thức request/response (yêu cầu/hồi đáp) để xác nhận trạng thái của tài khoản vừa gửi request (ở ví dụ này là active). Sau đó, bộ phận quản lý khởi tạo 1 chuyến đi mới và thông báo cho các bộ phận khác (bao gồm cả dispatcher) thông qua publish/subscribe (công bố/theo dõi). Bộ Dispatcher sẽ xác định một taxi tương ứng.
+
+Trên đây là các phương thức tương tác, bây giờ chúng ta hãy bàn về APIs.
+
+==== Định nghĩa API
+Một API của service là một giao kèo giữa service đó và các client của nó. Bất kể sự lựa chọn của bạn về cơ chế IPC, điều quan trọng là phải xác định chính xác API của service bằng cách sử dụng một số loại ngôn ngữ định nghĩa giao diện (IDL – Interface Definition Language). Thậm chí có những lý lẽ tốt cho việc sử dụng một cách tiếp cận API đầu tiên (https://www.programmableweb.com/news/how-to-design-great-apis-api-first-design-and-raml/how-to/2015/07/10[API-first approach]) để định nghĩa các service. Bạn bắt đầu phát triển một service bằng cách viết định nghĩa giao diện và xem xét nó với các nhà phát triển client. Đó là chỉ sau khi lặp qua định nghĩa API mà bạn thực thi service đó. Việc thực hiện trước thiết kế này làm tăng cơ hội của bạn trong việc xây dựng một service đáp ứng nhu cầu của các client.
+
+Ở các mục tiếp theo, ta sẽ thấy bản chất API phụ thuộc vào kĩ thuật IPC đang được sử dụng. Nếu bạn đang dùng messaging, API sẽ chứa kiểu tin nhắn và các kênh tin nhắn. Nếu bạn dùng HTTP, API chứa các URL và dạng request-response. Ở phần sau chúng ta sẽ mô tả một số IDL chi tiết hơn.
+
+==== Phát triển các API
+API của service thay đổi theo thời gian. Với ứng dụng đơn khối, cập nhật API nhìn chung khá dễ dàng. Đối với ứng dụng kiểu microservices, nó khó gấp 10 lần. Ta không thể ép các clients update cùng thời điểm với service. Do đó, việc cho ra đời các phiên bản mới, đồng thời hỗ trợ các bản cũ là điều tất yếu. Việc đề ra chiến thuật hợp lý cho vấn đề này là rất quan trọng.
+
+Chắc chắn ta nắm rõ quy mô thay đổi của API, vậy làm thế nào để xử lý hiệu quả?
+
+Với những thay đổi nhỏ và tính tương thích vẫn chưa bị phá vỡ. Ta có thể thêm các thuộc tính vào phần yêu cầu hoặc phần hồi đáp (lại thêm một lí do nữa để thiết kế clients và services theo chuẩn Robustnessfootnote:[https://en.wikipedia.org/wiki/Robustness_principle] (thiết kế mạnh)). Các clients sử dụng API cũ vẫn làm việc bình thường với phiên bản mới của service, tuy nhiên, với các request không được hỗ trợ, service sẽ trả về các giá trị mặc định, tương tự, clients cũng sẽ bỏ qua các hồi đáp không tương thích với phiên bản của clients.
+
+Với những thay đổi lớn, tính tương thích bị phá vỡ, khi clients chưa cập nhật, service phải chấp nhận hỗ trợ phiên bản cũ một thời gian. Nếu bạn đang sử dụng một cơ chế dựa trên HTTP như REST, một cách tiếp cận là nhúng các số phiên bản trong URL. Mỗi instance service có thể xử lý nhiều phiên bản cùng một lúc. Ngoài ra, bạn có thể triển khai các instance khác nhau mà mỗi cái xử lý một phiên bản riêng biệt
+
+==== Xử lý lỗi cục bộ
+Trong một hệ thống phân tán luôn tiềm ẩn các lỗi cục bộ, chẳng hạn, service có thể không đáp ứng kịp yêu cầu, ngưng hoạt động tạm thời, bị quá tải…
+
+Hãy cùng xem xét một kịch bản của sản phẩm ở phần trước (ứng dụng shopping). Giả sử service gợi ý mua hàng (Recommendation) không phản hồi, nếu chẳng may client nào đó được cài đặt một cách “ngô nghê” đang kết nối với service này, nó sẽ mãi mãi “đợi” phản hồi. Điều này khiến người dùng “bực” và hơn hết, nó chiếm dụng những thread liên quan. Cuối cùng, khi các thread bị chiếm dụng hết, toàn bộ chương trình sẽ bị treo. Bạn hãy theo dõi sơ đồ sau để có góc nhìn trực quan hơn:
+
+image::thread-block.png[]
+Vậy, nhiệm vụ sống còn cho hệ thống của bạn là phải xử lý tốt những lỗi cục bộ kiểu này.
+
+Vỏ quýt dày có móng tay nhọn, một phương pháp khá hiệu quả đã được mô tả chi tiết bởi Netflix.
+
+.Chiến lược này gồm các điểm đáng chú ý sau:
+- Network timeouts: timeout cho clients trong thời gian chờ hồi đáp, không block. Sử dụng timeouts đảm bảo tài nguyên client không bị chiếm dụng vô thời hạn.
+- Giới hạn số lượng các yêu cầu còn tồn tại (chưa xử lí): đặt một ngưỡng đánh dấu số request tối đa mà mỗi client có thể gửi tới một service. Quá con số này, mọi yêu cầu của client sẽ tự động hủy.
+- Mô hình cầu giao ngắt mạch (Circuit breaker pattern): thống kê số yêu cầu thành công và không thành công. Khi số yêu cầu lỗi vượt quá ngưỡng đã định, ngắt cầu giao (circuit breaker) để tất cả yêu cầu sau đó bị hủy ngay lập tức. Nếu số yêu cầu bị lỗi vẫn tiếp tục tăng lên, sẽ có thông báo rằng service không thể truy cập và việc gửi các yêu cầu là vô nghĩa. Sau 1 chu kì timeout, client có thể thử lại, nếu thành công, circuit breaker sẽ được đóng lại.
+- Fallback: trả lại cached data hoặc giá trị mặc định (tập rỗng hoặc các khuyến cáo)
+
+Netflix Hystrix là một thư viện mã nguồn mở hỗ trợ cài đặt mô hình chiến lược trên. Bạn đang dùng máy ảo Java (Java Virtual Machine)? Bạn nên cân nhắc Hystrix. Nếu không, bạn nên tìm một thư viện tương đương.
+
+==== Sử dụng message queue
+Khi sử dụng hệ thống thông điệp, các tiến trình tương tác nhờ trao đổi thông điệp (message). Client bắn một yêu cầu tới service bằng cách gửi thông điệp. Tương tự, bất kỳ consumer nào cũng có thể nhận được thông điệp từ một kênh. Xét về kênh, ta có 2 loại: điểm-điểm (point‑to‑point) và công bố-theo dõi (publish‑subscribe)
+
+- Các kênh dạng điểm-điểm có trách nhiệm chuyển thông điệp đến consumer đang tương tác với kênh này. Ở đây, các kênh điểm-điểm được service tận dụng cho kiểu tương tác 1-1 giữa client-service
+- Các kênh dạng công bố-theo dõi phân phát thông điệp tới một nhóm consumer được gắn kèm. Service dùng các kênh dạng này cho kiểu tương tác 1-n.
+
+Biểu đồ dưới đây nói về việc áp dụng kênh loại 2 (publish-subscribe) trong ứng dụng gọi xe taxi:
+
+image::pub_sub_channels.png[]
+
+Bộ phận quản lý tuyến (Trip Management service) khởi tạo một thông điệp với tiêu đề “TRIP CREATED” và bắn nó lên kênh publish/subscribe với mục đích thông báo về một chuyến đi mới tới các services liên quan (ví dụ: khối Dispatcher). Sau đó, khối Dispatcher tìm kiếm một tài xế thỏa mãn điều kiện rồi thông báo tới các khối services khác bằng cách viết thông điệp “DRIVER PROPOSED” và bắn nó lên kênh publish/subscribe.
+
+Có rất nhiều hệ thống thông điệp cho sự lựa chọn của bạn. Mách nhỏ, bạn nên chọn hệ thống hỗ trợ đa ngôn ngữ (ngôn ngữ lập trình nhé!)… Một số hệ thống hỗ trợ các giao thức chuẩn như AMQP và STOMP. Rabbit MQ, Apache Kafka, Apache ActiveMQ, NSQ… là những đại diện cho các hệ thống sử dụng mã nguồn mở. Ở cấp độ cao, chúng đều hỗ trợ nhiều định dạng thông điệp cũng như các loại kênh. Cuộc đua về hiệu năng, độ tin cậy và khả năng chịu tải giữa các hệ thống này chưa bao giờ đến hồi kết. Dù vậy, vẫn có kha khá những khác biệt về cách thức làm việc giữa chúng.
+
+.Ta dễ dàng thấy được một loạt các ưu điểm khi sử dụng hệ thống thông điệp:
+
+- Tách riêng client và service: client muốn tạo một request tới service thì chỉ việc gửi một message tới kênh thích hợp – thế là đủ
+- Bộ đệm cho thông điệp: với giao thức request/response đồng bộ (HTTP là một ví dụ), cả client và service phải sẵn sàng (available) trong suốt quá trình trao đổi. Mặt khác, một hệ thống đóng vai trò trung gian sẽ đẩy message vào hàng đợi để ghi vào kênh cho đến khi consumer nhận được message này. Ví dụ, một shop online có thể nhận được đơn hàng từ người mua hàng ngay cả khi hệ thống đáp ứng đơn hàng không sẵn sàng, bởi lẽ, đơn hàng kia sẽ được xếp ngay vào hàng đợi khi hệ thống đáp ứng có vấn đề.
+- Linh hoạt trong tương tác client-service: Như ta đã biết, hệ thống thông điệp (messaging) hỗ trợ hầu như tất cả các phương thức tương tác.
+- IPC được phân biệt rõ: các kĩ thuật RPC truy xuất một service ở xa giống như service cục bộ. Tuy nhiên qua những định luật vật lý và nguy cơ lỗi cục bộ, hai quá trình này lại khác nhau hoàn toàn. Hệ thống thông điệp lại càng đẩy chúng ra xa hơn, nhờ vậy, các dev sẽ tránh được nhầm lẫn đáng tiếc.
+
+.Chúng ta phải thừa nhận rằng, không thể tránh khỏi một số hạn chế của hệ thống thông điệp:
+- Thao tác phụ phức tạp: Hệ thống thông điệp giống như bao component khác, nó cần được cài đặt, hiệu chỉnh, rồi thực thi. Điều thiết yếu là phải đảm bảo bộ phận trung gian (the message broker) luôn luôn sẵn sàng, nếu không, độ tin cậy của hệ thống sẽ giảm sút.
+- Phức tạp trong việc thi hành kiểu tương tác request/response: kiểu tương tác request/response đòi hỏi một số công đoạn cài đặt. Mỗi request message phải có một module nhận diện kênh phản hồi (reply chanel) kèm với một module kiểm chứng ID tương ứng. Kéo theo đó, response từ service cần chứa ID tương ứng với kênh phản hồi. Khi hội tụ đủ các yếu tố này, client sẽ kiểm tra ID để đảm bảo request và response khớp nhau.
+
+==== Sử dụng REST
+Với kĩ thuật này, client gửi request đến service, service xử lí rồi gửi lại response. Ở đa số các client, thread dùng để tạo request sẽ bị chiếm dụng suốt quá trình chờ phản hồi. Một số client khác có thể sử dụng client code bất đồng bộ, hướng sự kiện (event-driven) mà có lẽ được đóng gói bởi Futures hoặc Rx Observables. Tuy nhiên, không giống như khi sử dụng tin nhắn (messaging), client giả định rằng response sẽ đến một cách kịp thời.
+
+Ngày nay, việc xây dựng APIs theo phong cách RESTful được coi là “mốt”. REST là một kĩ thuật IPC thường dùng tới giao thức HTTP. Khái niệm chính của REST là một tài nguyên (resources), thường đại diện cho đối tượng của doanh nghiệp (sản phẩm, khách hàng…). REST thao tác với resource nhờ các HTTP method. Ví dụ, method GET sẽ trả về các miêu tả chung của đối tượng dưới dạng file XML hoặc đối tượng JSON, method POST khởi tạo resource mới, còn PUT sẽ ứng với update một resource.
+[quote, Roy Fielding, Cha đẻ của REST]
+REST đem đến một tập hợp mang tính cấu trúc của các ràng buộc, nhằm nhấn mạnh tính đáp ứng của quá trình tương tác giữa các component; tính tổng quát của các interface; sự phát triển độc lập của các component; và các component trung gian để giảm độ trễ giữa các tương tác, tăng cường bảo mật, đóng gói các hệ thống di sản (encapsulate legacy systems)
+
+image::rest-booking.png[]
+
+Ứng dụng yêu cầu một chuyến xe thông qua việc khởi tạo POST request và trỏ nó đến /trip resource thuộc bộ phận quản lý tuyến (Trip Management). Bộ phận này xử lý bằng cách bắn GET request đến khối quản lý khách hàng. Khối quản lý khách hàng kiểm tra thông tin khách và gửi lại thông báo 200 nếu tài khoản hợp lệ. Tiếp đó, bộ phận quản lý tuyến tạo một lịch trình cho chuyến xe mới và gửi thông báo 201 tới smartphone của khách.
+
+Nhiều Dev tự nhận các API xây dựng trên HTTP của họ là RESTful nhưng sự thực không phải là tất cả. Leonard Richardson đã vạch rõ mô hình hoàn thiện cho REST như sau:
+
+- Level 0: client truy xuất tới service nhờ HTTP POST request. Mỗi request chỉ rõ hành động, mục tiêu (taget), một vài tham số đi kèm.
+- Level 1: API ở level 1 hỗ trợ về ý đồ của resource. POST request lúc này sẽ chỉ rõ hành động và các tham số đi kèm.
+- Level 2: API level 2 sử dụng HTTP methods để thực thi: GET: lấy thông tin, POST: khởi tạo, PUT: cập nhật.
+- Level 3: kiến trúc của level 3 API dựa trên nguyên tắc HATEOAS (Hypertext As The Engine Of Application State)
+
+.Như thường lệ, ta hãy điểm qua các điểm mạnh của việc sử dụng giao thức trên nền HTTP:
+
+- HTTP đơn giản và phổ biến
+- Bạn có thể kiểm tra một API HTTP từ bên trong một trình duyệt bằng cách sử dụng một phần mở rộng như Postmanhoặc từ dòng lệnh bằng cách sử dụng curl (giả sử JSON hoặc một số định dạng văn bản khác được sử dụng).
+- Hỗ trợ trực tiếp kiểu tương tác request/response
+- Đơn giản hóa kiến trúc hệ thống vì không cần dùng bộ phận trung gian.
+
+.Sau đây là nhược điểm:
+- Server luôn phải gửi response dưới dạng HTTP
+- Client và service phải luôn sẵn sàng trong quá trình trao đổi
+- Client phải biết địa chỉ của service instance. Như chúng ta đã đề cập trong phần thứ 2-API Gateway, vấn đề này không hề đơn giản, client cần một bộ tìm kiếm để xác định chính xác service instance.
+
+Gần đây, cộng đồng dev phát hiện ra giá trị của interface definition language – IDL đối với các RESTful API. Hai đại diện nổi bật của IDL gồm https://swagger.io/[Swagger] và https://raml.org/[RAML]. Swagger và các IDL tương tự cho phép ta định dạng request và response messages. Trong khi đó, họ nhà RAML yêu cầu các bản ghi riêng biệt như http://json-schema.org/[JSON Schema]. Các IDL cũng hỗ trợ các công cụ sinh ra client stubs và server skeletons từ một định nghĩa interface.
+
+==== Sử dụng GRPC
+
+[#servicediscovery]
+=== Service discovery
+==== Tại sao cần service discovery?
+
+Tưởng tượng rằng bạn đang viết một đoạn mã để truy cập đến một service mà service này có REST API. Đoạn mã đó cần có thông tin về vị trí mạng (địa chỉ IP và cổng) của một thực thể service để gửi yêu cầu. Trong một ứng dụng truyền thống chạy trên phần cứng vật lý, các vị trí mạng của các instance service là tương đối tĩnh. Ví dụ, code của bạn có thể đọc các vị trí mạng từ một tập tin cấu hình được cập nhật thường xuyên.
+
+Ngược lại, trong các ứng dụng microservices hiện đại được xây dựng và triển khai trên nền tảng điện toán đám mây. Do đó, việc truy tìm service là một nhiệm vụ khó khăn hơn rất nhiều, thể hiện trong sơ đồ sau đây.
+
+image::service-discovery.png[]
+
+Mỗi thực thể service trong một ứng dụng microservices đều được gán vị trí mạng và chúng có khuynh hướng thay đổi linh hoạt vì những tác động khác mang đến. Do đó, đoạn mã của client cần áp dụng một kỹ thuật tìm kiếm phức tạp hơn.
+
+Có hai mô hình chủ yếu được sử dụng để truy tìm service là: client-side discovery và server-side-discovery.
+
+===== Mô hình client-side discovery
+
+Mô hình client-side discovery quy định rằng các client sẽ phải xác định vị trí mạng của các service khả dụng và yêu cầu cân bằng tải. Để làm được điều này client cần truy vấn một cơ sở dữ liệu gọi là Service Registry. Đây là một cơ sở dữ liệu chứa thông tin và vị trí mạng của các thực thể service. Sau khi truy vấn được vị trí của service, client sử dụng một thuật toán cân bằng tải giúp chọn ra một service khả dụng để gửi yêu cầu.
+
+image::client_side_pattern.png[]
+.Mô hình này đối phó với việc vị trí mạng không ổn định của mỗi service bằng cách:
+- Khi khởi động service, ghi vị trí mạng vào Service Registry và xóa bỏ khi thực thể service này kết thúc.
+- Áp dụng kỹ thuật tín hiệu tuần hoàn (heartbeat mechanism) vào việc cập nhật vị trí mạng của các service.
+
+Netflix OSS cung cấp một ví dụ tuyệt vời của mô hình client-side discovery. Netflix Eureka là một service registry. Nó cung cấp một REST API cho việc quản lý đăng ký service-instance và cho việc truy vấn các instance có sẵn. Netflix Ribbon là một IPC client làm việc với Eureka để cân bằng tải các yêu cầu trên các service instance có sẵn.
+
+.Mô hình client-side discovery có những lợi ích:
+- Một mô hình đơn giản, ngoại trừ service registry thì không có gì phức tạp.
+
+.Những hạn chế:
+- Sự ràng buộc giữa client với Service Registry
+- Cần viết mã lệnh cho client đối với mỗi ngôn ngữ lập trình và framework
+
+===== Mô hình server-side discovery
+
+image::server-side-pattern.png[]
+
+Client tạo ra một yêu cầu tới một service thông qua một bộ cân bằng tải. Bộ cân bằng tải sẽ truy vấn Service Registry và định tuyến mỗi yêu cầu tới một instance service có sẵn. Cũng giống như mô hình client-side discovery, các instance service được đăng ký và hủy đăng ký với Service Registry.
+
+Một AWS Elastic Load Balancer (ELB) là ví dụ về một bộ định tuyến server-side discovery. Một ELB thường được sử dụng để cân bằng tải lưu lượng truy cập từ bên ngoài Internet. Tuy nhiên, bạn cũng có thể dùng ELB để cân bằng tải lưu lượng truy cập bên trong một đám mây riêng ảo (Virtual Private Cloud). Một client tạo ra yêu cầu (HTTP hay TCP) thông qua ELB sử dụng tên DNS của nó. ELB cân bằng tải lưu lượng truy cập trong một tập hợp các instance Elastic Compute Cloud (EC2) đã đăng ký hoặc các container EC2 Container Service (ECS). Không có một Service Registry riêng biệt. Thay vào đó, các instance EC2 và các container ECS được đăng ký với chính ELB.
+
+Các máy chủ HTTP và cân bằng tải như NGINX Plus và NGINX cũng có thể được sử dụng như là một cân bằng tải server-side discovery.
+
+Trong một vài môi trường triển khai như Kubernetes và Marathon, proxy đóng vai trò như một cân bằng tải. Để gửi một yêu cầu đến một service thì một client cần gửi yêu cầu thông qua proxy sử dụng địa chỉ IP của máy chủ và cổng service đã được gán. Sau đó, proxy sẽ chuyển tiếp yêu cầu đến một thực thể service khả dụng.
+
+.Server-side discovery có những lợi ích:
+- Các client chỉ cần gửi yêu cầu tới bộ cân bằng tải, quá trình truy tìm tách biệt với client, phần mã lệnh của client cũng đơn giản hơn. Do đó, giảm đi mã lệnh cho client đối với mỗi ngôn ngữ lập trình và framework.
+- Một vài môi trường triển khai cung cấp sẵn mô hình truy tìm service này, trong đó có AWS Elastic Load Balancer.
+
+.Những hạn chế của mô hình server-side discovery:
+- Nếu bộ cân bằng tải không được tích hợp sẵn vào môi trường triển khai thì bạn cần phải cài đặt và quản lý.
+
+==== Service Registry
+Service Registry (SR) là một bộ phận rất quan trọng trong truy tìm service. Nó là một cơ sở dữ liệu bao gồm vị trí mạng của các thực thể service, do đó khả năng cập nhật tức thời luôn là một yêu cầu cao. Về lý thuyết, các client có thể lưu vị trí mạng được lấy từ SR vào bộ nhớ tạm thời, nhưng chắc chắn rằng những thông tin này nhanh chóng vô dụng vì vị trí mạng thay đổi rất linh động và thường xuyên. Vậy nên, một SR bao gồm rất nhiều máy chủ sử dụng giao thức nhân bản để duy trì sự nhất quán dữ liệu.
+
+Như đã đề cập ở trên, Netflix Eureka là một ví dụ điển hình của một SR. Nó cung cấp một REST API giúp bạn đăng ký và truy vấn các thực thể service. Một thực thể service sử dụng lệnh POST để đăng ký vị trí mạng của nó và cứ mỗi 30 giây nó tiếp tục dùng lệnh PUT để gửi yêu cầu cập nhật đến SR. Thông tin của một service sẽ bị tự động xóa bỏ nếu không cập nhật sau 30 giây và nó cũng có thể bị xóa khi dùng lệnh HTTP DELETE. Client có thể sử dụng lệnh HTTP GET để lấy thông tin vị trí mạng của một service.
+
+Netflix có được tính khả dụng cao là nhờ chạy một hoặc nhiều máy chủ Eureka trong mỗi vùng AWS EC2 khả dụng. Mỗi máy chủ Eureka chạy trên một thực thể EC2 – có một địa chỉ IP Elastic. Các bản ghi của DNS TEXT được sử dụng để lưu trữ dữ liệu cấu hình của Eureka. Đó là một tấm bản đồ chứa thông tin các vùng khả dụng và danh sách các vị trí mạng của các máy chủ Eureka. Khi một máy chủ Eureka khởi động, nó truy vấn DNS để lấy thông tin cấu hình của nhóm Eureka, xác định vị trí các máy chủ khác và tự gán cho nó một địa chỉ IP Elastic chưa dùng đến.
+
+Eureka clients- service và service – clients truy vấn DNS để tìm ra vị trí mạng của các máy chủ Eureka. Clients được khuyến khích dùng một máy chủ Eureka trong cùng một vùng khả dụng. Tuy nhiên, nếu không còn cái nào khả dụng thì client sẽ sử dụng một máy chủ Eureka ở một vùng khả dụng khác.
+
+.Một vài ví dụ khác về SR:
+- etcd – một cơ sở dữ liệu key-value có tính khả dụng cao, phân phối và nhất quán sử dụng để tìm kiếm service. Kubernetes và Cloud Foundry là hai dự án nổi tiếng có dùng etcd.
+- consul – một công cụ giúp tìm kiếm và cấu hình các service. Nó cung cấp một bộ API cho phép các client đăng ký và tìm kiếm service. Consul có khả năng kiểm tra tính khả dụng của các service.
+- Apache Zookeeper – một service được sử dụng rộng rãi, có khả năng phối hợp cao dành cho các ứng dụng phân tán. Apache Zookeeper ban đầu là một phần dự án của Hadoop nhưng giờ nó là một dự án quan trọng hàng đầu.
+
+Cần nhắc lại rằng SR là một bộ phận được tích hợp trong hạ tầng service, những hệ thống như Kubernetes, Marathon và AWS không tồn tại một SR hoàn chỉnh.
+
+==== Các mô hình đăng ký thông tin service
+Bằng cách nào đó, thông tin của các thực thể service phải được ghi và xóa trong SR. Có hai phương pháp để giải quyết vấn đề này:
+
+- Một là thực thể service tự ghi thông tin lên SR https://microservices.io/patterns/self-registration.html[(self-registration pattern)]
+- Hai là sử dụng một công cụ hỗ trợ ghi và quản lý https://microservices.io/patterns/3rd-party-registration.html[(third party registration pattern)]
+
+===== Mô hình service tự ghi xóa thông tin
+
+Trong mô hình này, mỗi thực thể service sẽ chịu trách nhiệm trong việc ghi và xóa thông tin của chính nó trong SR. Đồng thời, mỗi thực thể cũng thường xuyên gửi các yêu cầu tuần hoàn để cập nhật thông tin.
+
+image::self-registration-pattern.png[]
+Netflix OSS Eureka client là một ví dụ minh họa cho mô hình này. Eureka client quản lý tất cả các vấn đề liên quan đến đăng ký và hủy đăng ký thông tin của các thực thể service. Dự án Spring Cloud (có hỗ trợ truy tìm service) giúp Eureka tự động ghi thông tin service một cách dễ dàng.
+
+Điểm lợi của mô hình này là nó tương đối đơn giản không yêu cầu sự trợ giúp của bất kỳ bên thứ ba nào. Tuy nhiên, việc các thực thể service bị ràng buộc với SR lại là một hạn chế, bạn cần phải viết các mã lệnh hỗ trợ việc đăng ký cho các service trong mỗi ngôn ngữ lập trình và framework.
+
+===== Mô hình hỗ trợ đăng ký bên thứ ba
+Trong mô hình này, các thực thể service sẽ không tự đăng ký thông tin với SR, công việc sẽ được giao cho một thành phần bên thứ ba đó là một Service Registrar. Nó sẽ thường xuyên kiểm tra xem khi một thực thể service khởi động lên, Service Registrar sẽ ghi thông tin vị trí mạng của service đó vào SR. Khi service dừng hoạt động, Registrar sẽ xóa thông tin về thực thể này khỏi SR.
+
+image::third-party-pattern.png[]
+Dự án nguồn mở Registrator là ví dụ về một service registrar. Nó tự động đăng ký và hủy đăng ký thông tin các thực thể service được triển khai bởi Docker containers. Registrator hỗ trợ một vài SR trong đó có etcd và Consul.
+
+Một ví dụ khác về service registrar là Netflix Prana. Mục đích chính của registrar này là hỗ trợ các service không được viết bởi ngôn ngữ JVM (Java Virtual Machine), nó là một ứng dụng phụ chạy song song với một thực thể service. Prana dùng Netflix Eureka để ghi và xóa thông tin của các thực thể service.
+
+Service registrar là một thành phần gắn liền với hạ tầng triển khai service. Mỗi thực thể EC2 được tạo ra bởi Autoscaling Group có thể được tự động đăng ký bởi một ELB. Các service của Kubernetes được tự động đăng ký và luôn khả dụng cho việc tìm kiếm.
+
+Một ưu điểm rõ ràng của mô hình này là các service không bị ràng buộc với SR, mã lệnh của service sẽ ít phức tạp hơn so với mô hình đầu tiên. Công việc đăng ký thông tin cho service được tập trung xử lý bởi một hệ thống của bên thứ ba. Một hạn chế của mô hình này đó là, bạn sẽ phải cài đặt và quản lý registrar nếu nó không là một phần của hạ tầng triển khai service hoặc không là một bộ phận luôn khả dụng trong hệ thống.
+
+[#eventsourcing]
+=== Event Driven Management
+==== Microservice và vấn đề quản lý dữ liệu phân tán
+Một ứng dụng nguyên khối thường có một cơ sở dữ liệu quan hệ duy nhất. Lợi ích chính của việc sử dụng cơ sở dữ liệu quan hệ là tính ACID.
+
+ACID là từ viết tắt các chữ cái đầu của bốn từ tiếng Anh atomicity, consistency, isolation, và durability. Chúng được coi là bốn thuộc tính quan trọng của một hệ quản trị cơ sở dữ liệu khi xử lý bất kỳ transaction nào. Nếu thiếu một trong những thuộc tính này thì tính toàn vẹn của cơ sở dữ liệu khó có thể được đảm bảo. Trong một hệ quản trị cơ sở dư liệu, một transaction là một đơn vị lô gích thao tác trên dữ liệu, có thể bao gồm nhiều thao tác. Chẳng hạn việc chuyển tiền từ tài khoản này sang tài khoản khác là một transaction, bao gồm thao tác trừ tiền một tài khoản và cộng tiền vào tài khoản kia.
+
+.Các tính chất ACID trong trường hợp này sẽ đảm bảo các transaction được thực hiện một cách đáng tin cậy:
+- Tính nguyên tố (Atomicity). Một transaction có nhiều thao tác khác biệt thì hoặc là toàn bộ các thao tác hoặc là không một thao tác nào được hoàn thành. Chẳng hạn việc chuyển tiền có thể thành công hay trục trặc vì nhiều lý do nhưng tính nguyên tố bảo đảm rằng một tài khoản sẽ không bị trừ tiền nếu như tài khoản kia chưa được cộng số tiền tương ứng.
+- Tính nhất quán (Consistency). Một transaction hoặc là sẽ tạo ra một trạng thái mới và hợp lệ cho dữ liệu, hoặc trong trường hợp có lỗi sẽ chuyển toàn bộ dữ liệu về trạng thái trước khi thực thi transaction.
+- Tính độc lập (Isolation). Một transaction đang thực thi và chưa được xác nhận phải bảo đảm tách biệt khỏi các transaction khác.
+- Tính bền vững (Durability). Dữ liệu được xác nhận sẽ được hệ thống lưu lại sao cho ngay cả trong trường hợp hỏng hóc hoặc có lỗi hệ thống, dữ liệu vẫn đảm bảo trong trạng thái chuẩn xác
+
+Một lợi ích lớn khác của việc sử dụng một cơ sở dữ liệu quan hệ là có SQL, một ngôn ngữ truy vấn phong phú, khai báo và được chuẩn hóa. Bạn có thể dễ dàng viết truy vấn kết hợp dữ liệu từ nhiều bảng và có thể tối ưu. Và bởi vì tất cả dữ liệu của ứng dụng nằm trong một cơ sở dữ liệu nên rất dễ truy vấn.
+
+Tuy nhiên, truy cập dữ liệu trở nên phức tạp hơn nhiều khi chúng ta chuyển sang microservices. Đó là bởi vì dữ liệu thuộc sở hữu của mỗi microservice là riêng tư đối với service đó và chỉ có thể được truy cập thông qua API của nó. Việc đóng gói dữ liệu đảm bảo rằng các microservice được kết hợp lỏng lẻo (loosely coupled) và có thể phát triển độc lập với nhau. Nếu nhiều service truy cập cùng một dữ liệu thì sẽ *cần sự phối hợp của tất cả các service để đảm bảo tính nhất quán và toàn vẹn dữ liệu.*
+
+Thậm chí các microservice khác nhau thường sử dụng các loại cơ sở dữ liệu khác nhau. Các ứng dụng hiện đại lưu trữ và xử lý các loại dữ liệu đa dạng chứ không nhất thiết phải sử dụng cơ sở dữ liệu quan hệ. Trong một số trường hợp, sử dụng NoSQL sẽ thuận tiện và giúp tăng hiệu suất và khả năng mở rộng tốt hơn nhiều. Hoặc có thể sử dụng Elasticsearch cho lưu trữ và truy vấn văn bản. Do đó, các ứng dụng dựa trên microservices thường sử dụng hỗn hợp các cơ sở dữ liệu SQL và NoSQL được gọi là phương pháp “polyglot persistence“.
+
+==== Một số thách thức trong quản lý dữ liệu phân tán
+Thách thức đầu tiên là làm thế nào để thực hiện các business transactions *duy trì tính thống nhất trên nhiều service*. Để xem tại sao đây là một vấn đề, chúng ta hãy xem một ví dụ về một cửa hàng B2B trực tuyến. Customer Service lưu trữ thông tin về khách hàng, bao gồm cả hạn mức tín dụng của họ. Order Service quản lý đơn đặt hàng và phải xác minh rằng đơn hàng mới không vượt quá giới hạn tín dụng của khách hàng. Trong phiên bản nguyên khối của ứng dụng này, Order Service chỉ cần sử dụng ACID transaction để kiểm tra tín dụng có sẵn và tạo đơn đặt hàng.
+
+Ngược lại, trong kiến trúc microservices, các bảng ORDER và CUSTOMER nằm ở các service khác nhau như diagram dưới đây.
+
+image::separate-tables.png[]
+Order Service không thể truy cập trực tiếp vào bảng CUSTOMER. Nó chỉ có thể sử dụng API được cung cấp bởi Customer Service. Order Service có thể sử dụng distributed transaction hay còn được gọi là https://en.wikipedia.org/wiki/Two-phase_commit_protocol[two-phase commit (2PC)]. Tuy nhiên, 2PC thường không phải là một lựa chọn khả thi trong các ứng dụng hiện đại. Định lý CAP đòi hỏi bạn phải lựa chọn giữa tính sẵn sàng và tính nhất quán ACID, và tính sẵn sàng thường là sự lựa chọn tốt hơn. Hơn nữa, nhiều công nghệ hiện đại, chẳng hạn như hầu hết các cơ sở dữ liệu NoSQL, không hỗ trợ 2PC. Dù vậy, việc duy trì tính nhất quán dữ liệu giữa các service và cơ sở dữ liệu là rất cần thiết, cho nên chúng ta phải có giải pháp cho vấn đề này.
+
+Thách thức thứ hai là cách *triển khai các truy vấn lấy dữ liệu từ nhiều service*. Ví dụ, hãy tưởng tượng rằng ứng dụng cần hiển thị một khách hàng và các đơn đặt hàng gần đây của anh ta. Nếu Order Service cung cấp một API để truy xuất các đơn đặt hàng của khách hàng thì bạn có thể truy xuất dữ liệu này bằng cách sử dụng các join dữ liệu từ nhiều service khác nhau bao gồm thông tin khách hàng từ Customer Service và các đơn đặt hàng của khách hàng từ Order Service. Tuy nhiên, giả sử rằng Order Service chỉ hỗ trợ tra cứu các đơn hàng bằng khóa chính của chúng (có lẽ NoSQL chỉ hỗ trợ các truy vấn dựa trên khóa chính). Trong tình huống này, không có cách rõ ràng để lấy dữ liệu cần thiết.
+
+==== Event driven architechture
+Đối với nhiều ứng dụng, giải pháp là sử dụng Event-Driven Architecture. Trong kiến trúc này, một service publish một event khi có gì đó đáng chú ý xảy ra, chẳng hạn như khi cập nhật một business entity. Các microservice khác đăng ký các event đó. Khi microservice nhận được một event, nó có thể cập nhật các business entity của riêng nó.
+
+Bạn có thể sử dụng các event để update business transactions trên nhiều service. Một transaction bao gồm một loạt các bước. Mỗi bước bao gồm một microservice cập nhật một business entity và publish một event kích hoạt bước tiếp theo. Trình tự sơ đồ sau đây cho thấy cách sử dụng phương pháp tiếp cận theo event để kiểm tra tín dụng khi tạo đơn đặt hàng. Các event trao đổi microservices thông qua một Message Broker.
+
+- Order Service tạo Đơn đặt hàng có trạng thái NEW và publish event Order Created.
+
+image::credit-check.png[]
+
+- Customer Service lắng nghe và xử lý (consume) event Tạo đơn đặt hàng bằng cách dự trữ tín dụng cho đơn đặt hàng này và publish event Credit Reserved.
+
+image::credit-check-2.png[]
+- Order Service lắng nghe và xử lý event Credit Reserved và thay đổi trạng thái của đơn đặt hàng thành OPEN.
+
+image::credit-check-3.png[]
+
+Với điều kiện (a) mỗi service cập nhật cơ sở dữ liệu một cách nguyên tố (atomically) và publish một event và (b) Message Broker đảm bảo rằng các event được gửi ít nhất một lần, bằng cách này bạn có thể thực hiện các business transactions trên nhiều service. Điều quan trọng cần lưu ý rằng nó không đảm bảo tính ACID mà chỉ có thể đạt được tính nhất quán cuối cùng https://en.wikipedia.org/wiki/Eventual_consistency[(eventual consistency)]. Mô hình transaction này được gọi là https://queue.acm.org/detail.cfm?id=1394128[BASE model].
+
+Bạn cũng có thể sử dụng các event để duy trì chế độ xem được thực hiện trước (*materialized views*) khi kết hợp dữ liệu từ nhiều microservice. Service duy trì View sẽ xem đăng ký các event có liên quan và cập nhật lại View khi có thay đổi. Ví dụ: Customer Order View Updater Service duy trì chế độ xem Đơn hàng của khách hàng sẽ đăng ký các event được publish từ Customer Service và Order Service.
+
+image::subscribe.png[]
+Event-driven architecture có một số lợi ích cũng như hạn chế. Nó cho phép thực hiện các transaction trên nhiều service và cung cấp tính nhất quán cuối cùng (eventual consistency). Một lợi ích khác là nó cũng cho phép một ứng dụng duy trì materialized views.
+
+Một nhược điểm là *mô hình lập trình phức tạp* hơn so với việc sử dụng các transaction ACID. Thông thường, bạn phải thực hiện các transaction bù trừ để phục hồi từ các lỗi cấp ứng dụng; ví dụ: bạn phải hủy đơn hàng nếu kiểm tra tín dụng không thành công. Ngoài ra, các ứng dụng phải đối phó với dữ liệu không phù hợp khi bị thay đổi giữa chừng. Một hạn chế khác là subscribers phải phát hiện và bỏ qua các event trùng lặp.
+
+==== Bảo đảm tính nguyên tố
+Trong event-driven architecture, chúng ta thường gặp phải vấn đề về cập nhật cơ sở dữ liệu và xuất bản một event. Ví dụ, Order Service phải insert một row vào table ORDER và xuất bản (publish) một event (event) Order Created. Điều quan trọng là hai hoạt động này được thực hiện một cách nguyên tố. Nếu service bị crash sau khi cập nhật cơ sở dữ liệu nhưng trước khi xuất bản event, hệ thống sẽ trở nên không nhất quán. Cách tiêu chuẩn để đảm bảo nguyên tố là sử dụng một distributed transaction liên quan đến cơ sở dữ liệu và Message Broker. Tuy nhiên, vì những lý do được mô tả ở trên, chẳng hạn như định lý CAP, đây chính xác là những gì chúng ta không muốn làm.
+
+==== Publishing event sử dụng local transaction
+Một cách để đạt được nguyên tố là bằng cách sử dụng quy trình nhiều bước chỉ liên quan đến các Local Transactions. Bí quyết là có một bảng EVENT, có chức năng như một hàng đợi thông báo, trong cơ sở dữ liệu lưu trữ trạng thái của các thực thể nghiệp vụ. Ứng dụng bắt đầu một local transaction, cập nhật trạng thái của các thực thể nghiệp vụ, insert một event vào bảng EVENT và commits transaction đó. Một process khác biệt truy vấn bảng EVENT, và pulish các event cho Message Broker, và sau đó sử dụng một local transaction để đánh dấu các event được xuất bản như diagram dưới đây:
+
+image::local-transaction.png[]
+Order Service insert một hàng vào bảng ORDER và insert một Order Created event vào bảng EVENT. Event Publisher thread truy vấn bảng EVENT cho các event chưa được xuất bản để xuất bản các event và sau đó cập nhật bảng EVENT để đánh dấu các event được xuất bản.
+
+Cách tiếp cận này có một số lợi ích và hạn chế. Một lợi ích là nó đảm bảo một event được xuất bản cho mỗi lần cập nhật mà không dựa vào 2PC. Ngoài ra, ứng dụng xuất bản các event cấp doanh nghiệp, giúp loại bỏ sự cần thiết phải suy ra chúng. Một nhược điểm của phương pháp này là nó có khả năng bị lỗi vì developer phải nhớ xuất bản các event. Một hạn chế của phương pháp này là nó rất khó thực hiện khi sử dụng một số cơ sở dữ liệu NoSQL vì khả năng truy vấn và transaction hạn chế của chúng.
+
+Bây giờ chúng ta hãy xem xét một phương pháp đạt được tính nguyên tố khác.
+
+==== Database transaction log
+Một cách khác để đạt được nguyên tố mà không có 2PC là cho các event được xuất bản bởi một thread hoặc một process khai thác database’s transaction hoặc commit log. Ứng dụng cập nhật cơ sở dữ liệu, dẫn đến những thay đổi được ghi lại trong nhật ký transaction của cơ sở dữ liệu. Transaction Log Miner thread đọc nhật ký transaction và xuất bản event cho Message Broker như diagram dưới đây:
+
+image::transaction-log.png[]
+Một ví dụ về cách tiếp cận này là dự án mã nguồn mở LinkedIn Databus. Databus khai thác nhật ký transaction Oracle và xuất bản các event tương ứng với các thay đổi. LinkedIn sử dụng Databus để giữ các kho dữ liệu có nguồn gốc khác nhau phù hợp với hệ thống bản ghi.
+
+Transaction log mining có nhiều lợi ích và hạn chế khác nhau. Một lợi ích là nó đảm bảo rằng một event được xuất bản cho mỗi lần cập nhật mà không cần sử dụng 2PC. Transaction log mining cũng có thể đơn giản hóa ứng dụng bằng cách tách xuất bản event khỏi logic nghiệp vụ của ứng dụng. Một nhược điểm lớn là định dạng của transaction log là khác nhau đối với mỗi cơ sở dữ liệu và thậm chí có thể thay đổi giữa các phiên bản cơ sở dữ liệu.
+
+==== Sử dụng event sourcing
+Event Sourcing đạt được tính nguyên tố mà không cần 2PC bằng cách sử dụng phương pháp tiếp cận event khác. Thay vì lưu trữ trạng thái hiện tại của một thực thể, ứng dụng lưu trữ một chuỗi các event thay đổi trạng thái. Ứng dụng xây dựng lại trạng thái hiện tại của một thực thể bằng cách phát lại các event. Bất cứ khi nào trạng thái của một thực thể nghiệp vụ thay đổi, một event mới được nối vào danh sách các event. Vì việc lưu một event là một hoạt động đơn lẻ, nó vốn dĩ là nguyên tố.
+
+Để xem cách hoạt động của nguồn event, hãy xem xét thực thể Đơn hàng làm ví dụ. Trong cách tiếp cận truyền thống, mỗi đơn hàng ánh xạ tới một hàng trong bảng ORDER và tới các hàng trong, ví dụ như bảng ORDER_LINE_ITEM. Nhưng khi sử dụng Event Sourcing, Order Service lưu trữ một Đơn đặt hàng dưới dạng các event thay đổi trạng thái của nó: Created, Approved, Shipped, Cancelled. Mỗi event chứa đủ dữ liệu để tái tạo lại trạng thái của Đơn đặt hàng.
+
+image::event-sourcing.png[]
+Events được lưu trữ trong Event Store. Event Store cũng hoạt động giống như Message Broker trong các kiến trúc mà chúng tôi đã mô tả trước đó. Nó cung cấp một API cho phép các service đăng ký các event. Event Store cung cấp tất cả event cho tất cả người đăng ký quan tâm. Event Store là xương sống của event-driven microservices architecture.
+
+Event sourcing có nhiều lợi ích. Nó giải quyết một trong những vấn đề chính trong việc thực hiện event-driven architecture và làm cho nó có thể xuất bản event đáng tin cậy bất cứ khi nào thay đổi trạng thái. Kết quả là, nó giải quyết các vấn đề nhất quán về dữ liệu trong kiến trúc microservices. Event sourcing cũng cung cấp nhật ký kiểm tra đáng tin cậy 100% về các thay đổi được thực hiện cho một thực thể nghiệp vụ và có thể thực hiện các truy vấn thời gian xác định trạng thái của một thực thể tại bất kỳ thời điểm nào. Điều này làm cho nó dễ dàng hơn nhiều để di chuyển từ một ứng dụng nguyên khối sang microservices.
+
+Event sourcing cũng có một số hạn chế. Đó là một phong cách lập trình khác và không quen thuộc và do đó cần thời gian để học hỏi, nghiên cứu thêm. Bạn phải sử dụng Command Query Responsibility Segregation (CQRS) để thực hiện truy vấn và phải xử lý để đạt được trạng thái dữ liệu nhất quán cuối cùng (eventually consistent data).
+
+==== Saga Pattern
+
+Một Saga là một chuỗi local transaction, mỗi local transaction là một mắt xích thực hiện update dữ liệu vào database và publish các message hoặc event để trigger local transaction tiếp theo trong chuỗi saga. Nếu 1 local transaction thất bại do lỗi luồng nghiệp vụ thì saga sẽ thực hiện các bước `compensating` để rollback lại những dữ liệu đã bị thay đổi ở các bước local transaction thực hiện trước đó.footnote:[Hector & Kenneth - Sagas (1987)]
+
+image::saga.png[]
+
+===== Khi nào nên dùng saga?
+
+Với ưu điểm không bị lock như 2PC, các thao tác thực hiện bất đồng bộ nên Saga có hiệu năng cao. Tuy nhiên saga cũng có những nhược điểm sau:
+
+* Việc implement phức tạp, cần phải định nghĩa `compensating` cho mỗi step thực hiện.
+* Thiếu tính `isolution`: nhưng có thể giải quyết bằng cách bổ sung các trạng thái trung gian
+
+Với những ưu và nhược điểm đó, chỉ nên sử dụng saga trong trường hợp nghiệp vụ kinh doanh phức tạp, đi qua nhiều service (3 - 4 service trở lên). Hoặc khi phải giao tiếp với các hệ thống cũ bên ngoài
+
+===== Phân loại saga
+
+====== Choreography Saga
+
+Mỗi local transaction sau khi thực hiện sẽ publish các domain event để  trigger local transaction ở các service khác.
+
+image::Create_Order_Saga.png[]
+
+<1> Client gửi request tạo order (`POST /orders`) tới `Order Service`, `Order service` tạo 1 order ở trạng thái `PENDING`.
+<2> Sau đó `Order service` sẽ publish 1 event `Order Created`
+<3> `Customer Service` sẽ subscribe event này và thực hiện việc `reserve` tín dụng của khách hàng.
+<4> `Customer Service` publish 1 event kết quả thực hiện
+<5> `Order Service` subscribe event này và thực hiện `approves` hoặc `rejects` cho `order`
+
+====== Orchestration Saga
+
+Một đối tượng sẽ đóng vai trò là trung gian lấy ra các local transaction nào sẽ được thực hiện.
+
+image::Create_Order_Saga_Orchestration.png[]
+
+<1> Client gửi request tạo order (`POST /orders`) tới `Order Service`, `Order service` tạo 1 đối tượng `Create Order` saga.
+<2> Saga sẽ tạo 1 order ở trạng thái `PENDING`.
+<2> Sau đó saga gửi `Reserve Credit command` tới `Customer Service`
+<3> `Customer Service` sẽ subscribe command này và thực hiện việc `reserve` tín dụng của khách hàng.
+<4> Sau đó `Customer Service` send message reply lại cho saga.
+<5> `Saga` dựa vào kết quả `Customer Service` trả lại để thực hiện `approves` hoặc `rejects` cho `order`
+
+
+[#deploymentstrategy]
+=== Chiến lược triển khai (Deployment strategy) cho microservice
+Triển khai một ứng dụng nguyên khối có nghĩa là chạy nhiều bản sao giống hệt nhau của một ứng dụng trên một hoặc nhiều máy chủ. Thường sẽ có N các máy chủ (vật lý hoặc ảo) và chạy M các instance của ứng dụng trên mỗi máy chủ. Việc triển khai ứng dụng nguyên khối không phải lúc nào cũng đơn giản, nhưng nó đơn giản hơn nhiều so với việc triển khai một ứng dụng microservices.
+
+Một ứng dụng microservices bao gồm *hàng chục hoặc thậm chí hàng trăm service*. Các service được viết bằng nhiều ngôn ngữ và khuôn khổ khác nhau. Mỗi ứng dụng là một ứng dụng nhỏ với các yêu cầu về triển khai, tài nguyên, nhân rộng và theo dõi cụ thể của riêng mình. Ví dụ, bạn cần phải chạy một số lượng các instances nhất định của mỗi service dựa trên nhu cầu cho service đó. Ngoài ra, mỗi instances phải được cung cấp với các tài nguyên CPU, bộ nhớ và I/O thích hợp. Ngoài ra, *việc triển khai các service phải nhanh chóng, đáng tin cậy và hiệu quả về chi phí.*
+
+Dưới đây sẽ chỉ ra 3 cách triển khai microservice
+
+==== Deploy nhiều loại service trên cùng một máy chủ
+Khi sử dụng pattern này, bạn cung cấp một hoặc nhiều máy chủ vật lý hoặc ảo và chạy nhiều phiên bản service trên mỗi máy chủ. Đây là cách tiếp cận truyền thống để triển khai ứng dụng. Mỗi cá thể service chạy tại một cổng biết trước trên một hoặc nhiều máy chủ.
+
+image::deployment-host.png[]
+Pattern này có cả lợi ích và nhược điểm. Một lợi ích lớn là việc *sử dụng tài nguyên của nó là tương đối hiệu quả*. Nhiều service instance chia sẻ máy chủ và hệ điều hành của nó. Nó thậm chí còn hiệu quả hơn nếu một process hoặc process group chạy nhiều cá thể service, ví dụ nhiều ứng dụng web chia sẻ cùng một máy chủ Apache Tomcat và JVM.
+
+Một lợi ích khác của pattern này là triển khai một cá thể service tương đối nhanh. Bạn chỉ cần sao chép service vào một máy chủ và khởi động nó. Nếu service được viết bằng Java thì cần sao chép tệp JAR hoặc WAR. Đối với các ngôn ngữ khác, chẳng hạn như Node.js hoặc Ruby thì chỉ cần sao chép mã nguồn.
+
+Ngoài ra, do không bị overhead nên việc *khởi động một service thường rất nhanh.*
+
+Tuy nhiên, pattern này cũng có một số hạn chế đáng kể. Một nhược điểm lớn là có rất ít hoặc *không có sự cô lập của các cá thể service*, trừ khi mỗi cá thể service là một tiến trình riêng biệt. Trong khi có thể giám sát chính xác việc sử dụng tài nguyên của từng cá thể service, bạn không thể giới hạn các tài nguyên mà mỗi cá thể sử dụng. Có thể cho một service instance bị lỗi để tiêu thụ tất cả bộ nhớ hoặc CPU của máy chủ.
+
+Một vấn đề quan trọng khác với phương pháp này là operations team triển khai service phải biết chi tiết cụ thể về cách thức triển khai. Các service có thể được viết bằng nhiều ngôn ngữ và khuôn khổ khác nhau, do đó có rất nhiều chi tiết mà nhóm phát triển phải chia sẻ với operations team. Sự phức tạp này làm tăng nguy cơ lỗi trong quá trình triển khai.
+
+Như bạn thấy, mặc dù pattern này khá quen thuộc nhưng lại có một số hạn chế đáng kể. Bây giờ chúng ta hãy xem xét các cách triển khai các service microservices khác để tránh những vấn đề này.
+
+==== Deploy mỗi loại service trên một máy chủ
+Khi sử dụng pattern này, bạn chạy từng cá thể service riêng biệt trên máy chủ riêng của nó. Có hai cách: mỗi service instance trong một máy ảo (VM) hoặc mỗi service instance trong một Container.
+
+===== Mỗi service instance trên một máy ảo
+Khi sử dụng pattern mỗi service instance trong một máy ảo, bạn đóng gói từng service dưới dạng một máy ảo image như Amazon EC2 AMI. Mỗi cá thể service là một máy ảo (ví dụ, một cá thể EC2) được khởi chạy bằng cách sử dụng VM image đó.
+
+image::deployment-vm.png[]
+Đây là phương pháp chính được Netflix sử dụng để triển khai service phát trực tuyến video của mình. Netflix gói mỗi service của nó thành các AMI EC2 sử dụng Aminator. Mỗi cá thể service đang chạy là một cá thể EC2.
+
+Có một số công cụ có thể sử dụng để xây dựng các máy ảo của riêng bạn. Bạn có thể cấu hình continuous integration (CI) server (ví dụ, Jenkins) để gọi Aminator đóng gói các service thành các AMI EC2. Packer.io là một tùy chọn khác để tạo VM image tự động. Không giống như Aminator, nó hỗ trợ nhiều công nghệ ảo hóa bao gồm EC2, DigitalOcean, VirtualBox và VMware.
+
+Công ty Boxfuse có một cách để xây dựng VM image, vượt qua những hạn chế của máy ảo. Boxfuse gói ứng dụng Java thành một VM image tối thiểu. Những image này rất nhanh để xây dựng, khởi động nhanh và an toàn hơn.
+
+Công ty CloudNative có Bakery, một sản phẩm SaaS để tạo ra EC2 AMIs. Có thể cấu hình máy chủ CI để gọi Bakery để đóng gói service thành một AMI, giúp bạn không phải lãng phí thời gian quý báu khi thiết lập cơ sở hạ tầng tạo AMI.
+
+Một lợi ích chính của VM là mỗi cá thể service chạy trong sự cô lập hoàn toàn. Nó có một số lượng cố định của CPU và bộ nhớ và không thể lấy tài nguyên từ các service khác.
+
+Một lợi ích khác là có thể tận dụng cơ sở hạ tầng đám mây. Các đám mây như AWS cung cấp các tính năng hữu ích như cân bằng tải và tự động tính toán.
+
+Một lợi ích to lớn khác nữa là nó đóng gói công nghệ triển khai service. Một khi một service đã được đóng gói như một máy ảo, nó sẽ trở thành một black-box. VM’s management API trở thành API để triển khai service. Triển khai trở nên đơn giản và đáng tin cậy hơn nhiều.
+
+Tuy nhiên nó cũng có một số hạn chế. Một nhược điểm là sử dụng tài nguyên kém hiệu quả hơn. Mỗi cá thể service có phí trên toàn bộ máy ảo, bao gồm cả hệ điều hành. Hơn nữa, trong một public IaaS điển hình, các máy ảo có kích thước cố định và có thể máy ảo sẽ không được sử dụng đúng mức.
+
+Nữa là, một public IaaS thường tính phí cho máy ảo bất kể là nó có được xài hay không. IaaS của AWS cung cấp tính năng tự động tính toán nhưng rất khó để phản ứng nhanh chóng với những thay đổi về nhu cầu. Do đó, bạn thường phải dự phòng thêm máy ảo và điều đó sẽ làm tăng chi phí triển khai.
+
+Một nhược điểm khác của phương pháp này là triển khai phiên bản service mới thường chậm. VM image build rất chậm do kích thước của chúng. Ngoài ra, các máy ảo cũng chậm khi khởi động lại. Ngoài ra, một hệ điều hành thường tốn thời gian để khởi động. Tuy nhiên, lưu ý rằng điều này không đúng hoàn toàn, bạn có thể sử dụng Boxfuse để giải quyết các vấn đề đó.
+
+Một nhược điểm khác của việc triển khai mỗi service instance trong một máy ảo là bạn (hoặc một người nào đó trong tổ chức) phải làm thêm rất nhiều công việc về xây dựng và quản lý máy ảo. Trừ khi bạn sử dụng công cụ như Boxfuse xử lý cho việc xây dựng và quản lý các máy ảo, còn không thì đó là trách nhiệm của bạn. Việc này là cần thiết nhưng sẽ gây tốn nhiều thời gian trong việc xây dựng ứng dụng chính.
+
+Bây giờ chúng ta hãy xem xét một cách khác để triển khai các service nhẹ nhàng hơn nhưng vẫn có nhiều lợi ích của các máy ảo.
+
+===== Mỗi service instance trong một container
+Mỗi cá thể service chạy trong container riêng của nó. Container là một cơ chế ảo hóa ở cấp hệ điều hành. Container bao gồm một hoặc nhiều process chạy trong hộp sandbox. Từ quan điểm của các process, chúng có không gian port và hệ thống tập tin root filesystem riêng của chúng. Có thể giới hạn bộ nhớ và tài nguyên CPU của container. Ví dụ về công nghệ container bao gồm Docker và Solaris Zones.
+
+image::deployment-container.png[]
+Để sử dụng pattern này, bạn đóng gói service của mình dưới dạng container image. Container image là hình ảnh hệ thống tệp bao gồm các ứng dụng và thư viện cần thiết để chạy service. Một số container image bao gồm một hệ thống tập tin Linux hoàn chỉnh. Những image khác sẽ nhẹ hơn. Để triển khai một service Java, bạn xây dựng một container image chứa Java runtime, một máy chủ Apache Tomcat và ứng dụng Java đã biên dịch.
+
+Khi đóng gói service của mình dưới dạng container image, bạn sẽ khởi chạy một hoặc nhiều container. Bạn thường chạy nhiều container trên mỗi máy chủ ảo hoặc vật lý. Có thể sử dụng trình quản lý cluster như Kubernetes hoặc Marathon để quản lý container của mình. Cluster manager xử lý các máy chủ như một nhóm tài nguyên. Nó quyết định vị trí đặt từng container dựa trên các tài nguyên theo yêu cầu của container và tài nguyên có sẵn trên mỗi máy chủ lưu trữ.
+
+Pattern này có cả lợi ích và hạn chế. Lợi ích của các container tương tự như của các máy ảo. Chúng tách biệt các cá thể service của bạn với nhau. Bạn có thể dễ dàng theo dõi các tài nguyên được tiêu thụ bởi mỗi container. Ngoài ra, giống như các máy ảo, các container đóng gói công nghệ được sử dụng để triển khai các service. API quản lý container cũng hoạt động như API để quản lý service của bạn.
+
+Tuy nhiên, không giống như các máy ảo, các container nhẹ hơn nhiều. Build các container image rất nhanh. Ví dụ, trên máy tính xách tay của tôi chỉ tốn khoảng là 5 giây để đóng gói một ứng dụng Spring Boot dưới dạng một container Docker. Các container cũng khởi động rất nhanh vì không cần khởi động hệ điều hành. Khi một container start, các service sẽ được start ngay lập tức.
+
+Có một số nhược điểm khi sử dụng các container. Đó là công nghệ này chưa ổn định như máy ảo. Ngoài ra, các container không an toàn như các máy ảo vì các chúng chia sẻ kernel của hệ điều hành chủ với nhau.
+
+Một nhược điểm khác của các container là bạn chịu trách nhiệm cho việc quản lý các container image. Ngoài ra, trừ khi bạn đang sử dụng một giải pháp lưu trữ container như Google Container Engine hoặc Amazon EC2 Container Service (ECS), thì bạn phải quản lý cơ sở hạ tầng container và có thể là cả cơ sở hạ tầng VM mà nó chạy.
+
+Ngoài ra, các container thường được triển khai trên cơ sở hạ tầng có định giá theo từng VM. Do đó, như đã mô tả ở trên, bạn có thể sẽ phải trả thêm chi phí cho các máy ảo quá mức để xử lý các tải đột biến.
+
+Thật thú vị, *sự khác biệt giữa các container và máy ảo có vẻ như đang bị xóa bỏ*. Như đã đề cập trước đó, các máy ảo Boxfuse rất nhanh để build và start. Dự án Clear Containers nhằm tạo ra các máy ảo nhẹ. Docker, Inc. gần đây đã mua lại Unikernel Systems nhằm cải tiến việc xây dựng các image nhanh hơn và nhẹ hơn.
+
+Ngoài ra còn có khái niệm mới hơn và ngày càng phổ biến như server-less deployment, đó là một cách tiếp cận để tránh sự cố phải chọn giữa triển khai service trong các container hoặc máy ảo. Hãy cùng xem xét.
+
+[#mono2micro]
+=== Tái cấu trúc ứng dụng nguyên khối thành Microservice
+Có khả năng là bạn đang làm việc trên một ứng dụng nguyên khối phức tạp kèm với việc phát triển và triển khai ứng dụng chậm và khó khăn. Việc chuyển đổi thành Microservice dường như là bất khả thi. Dù vậy, trong phần này, chúng ta hãy xem xét những chiến lược mà bạn có thể sử dụng để thoát khỏi địa ngục nguyên khối, cách làm thế nào để từng bước tái cấu trúc một ứng dụng nguyên khối thành một tập hợp các microservices.
+
+Quá trình chuyển đổi một ứng dụng nguyên khối thành microservices là một hình thức hiện đại hóa ứng dụng. Đó là điều mà các developer đã làm trong nhiều thập kỷ. Kết quả là, có một số ý tưởng mà chúng ta có thể học hỏi khi tái cấu trúc một ứng dụng thành microservices.
+
+Điều đầu tiên và chắc chắn là các bạn không nên viết lại toàn bộ ứng dụng theo lối “Big Bang”. Nghĩa là khi bạn tập trung tất cả các nỗ lực vào việc xây dựng một ứng dụng dựa trên microservices mới từ đầu. Mặc dù có vẻ hấp dẫn nhưng nó rất nguy hiểm và có khả năng sẽ kết thúc trong thất bại. Như Martin Fowler đã nói, “khi bạn làm theo kiểu Big Bang thì khả năng bạn nhận được là một Vụ nổ Big Bang!”
+
+Thay vì viết lại toàn bộ ứng dụng từ đầu, bạn nên từng bước tái cấu trúc ứng dụng nguyên khối của mình. Dần xây dựng các ứng dụng mới theo hướng microservice, và chạy nó cùng với ứng dụng nguyên khối. Theo thời gian, số lượng chức năng được thực hiện bởi ứng dụng nguyên khối co lại cho đến khi nó biến mất hoàn toàn hoặc trở thành một microservice khác.
+
+==== Đừng làm nó phình to
+Định luật Holes nói rằng bất cứ khi nào bạn đang ở trong một cái hố thì bạn nên ngừng đào nó tiếp. Đây là lời khuyên tuyệt vời khi ứng dụng nguyên khối của bạn trở nên không thể quản lý được. Nói cách khác, bạn nên ngừng làm cho khối đá lớn hơn. Điều này có nghĩa là khi đang thực hiện chức năng mới, bạn không nên thêm nhiều mã nguồn vào khối. Thay vào đó hãy viết thành các microservice. Sơ đồ sau đây cho thấy kiến trúc hệ thống sau khi áp dụng phương pháp này.
+
+image::pull-module-from-monolith.png[]
+Song kèm với ứng dụng nguyên khối hiện tại là các microservice mới được viết mới, cùng với đó là 2 thành phần khác.
+
+Đầu tiên là *request router*, xử lý các request (HTTP) tới. Nó tương tự như API Gateway. Router gửi các yêu cầu tương ứng với chức năng mới đến service mới. Nó định tuyến các legacy request tới ứng dụng nguyên khối.
+
+Các thành phần khác là *Glue code* dùng để tích hợp service mới với ứng dụng nguyên khối. Một service hiếm khi tồn tại trong sự cô lập và thường cần truy cập dữ liệu thuộc sở hữu của ứng dụng nguyên khối. Glue code nằm trong ứng dụng khối hoặc trong service mới hoặc cả hai, chịu trách nhiệm tích hợp dữ liệu. Service sử dụng Glue code để đọc và ghi dữ liệu thuộc sở hữu của ứng dụng khối.
+
+.Có ba chiến lược mà một service mới có thể sử dụng để truy cập dữ liệu của ứng dụng nguyên khối:
+. Gọi một remote API được cung cấp bởi ứng dụng nguyên khối
+. Truy cập trực tiếp cơ sở dữ liệu của ứng dụng nguyên khối
+. Duy trì bản sao dữ liệu của riêng nó, được đồng bộ hóa với cơ sở dữ liệu của ứng dụng nguyên khối
+
+Glue code đôi khi được gọi là lớp anti-corruption layer. Glue code ngăn cản các service mới phải quan tâm trực tiếp đến các khái niệm domain model trong ứng dụng nguyên khối cũ. Glue code sẽ làm nhiệm vụ chuyển đổi giữa các domain model khác nhau. Thuật ngữ anti-corruption layer đầu tiên xuất hiện trong cuốn sách nổi tiếng Domain Driven Design của Eric Evans. Phát triển một anti-corruption layer có thể là một công việc không dễ dàng. Nhưng nó là điều cần thiết nếu muốn phát triển theo hướng dần thoái khỏi khỏi địa ngục nguyên khối.
+
+Thực hiện chức năng mới như một lightweight service có một vài lợi ích. Nó ngăn cản khối trở nên không thể quản lý được nữa. service có thể được phát triển, triển khai và thu nhỏ độc lập với khối. Bạn trải nghiệm những lợi ích của kiến trúc microservices cho mỗi service mới mà bạn tạo ra.
+
+Tuy nhiên, cách tiếp cận này chưa bay vào trực tiếp mổ xẻ khối thành những phần nhỏ hơn. Để khắc phục những vấn đề đó bạn cần phải phá vỡ khối đá. Hãy xem xét các chiến lược để làm điều đó.
+
+==== Phân tách FrontEnd và BackEnd
+Một chiến lược thu nhỏ ứng dụng nguyên khối là tách presentation layer khỏi business logic và data access layers.
+
+.Một ứng dụng doanh nghiệp điển hình bao gồm ít nhất ba loại component khác nhau:
+- Presentation layer – Các thành phần xử lý các yêu cầu HTTP và triển khai API (REST) hoặc giao diện người dùng web dựa trên HTML. Trong một ứng dụng có giao diện người dùng, Presentation layer thường cũng có một phần lớn mã nguồn logic trong đó.
+- Business logic layer – Các core component của ứng dụng thực hiện các business rules.
+- Data-access layer – Các thành phần truy cập các thành phần cơ sở hạ tầng như cơ sở dữ liệu và message brokers.
+
+Thường có sự tách biệt rõ ràng giữa presentation logic một bên và business và data-access logic một bên. Business tier có API tổng hợp bao gồm một hoặc nhiều interface dạng facades đóng gói các thành phần business logic. API này là một đường biên tự nhiên mà bạn có thể chia khối nguyên khối thành hai ứng dụng nhỏ hơn. Một ứng dụng có chứa tầng trình bày (presentation layer). Ứng dụng kia có chứa logic nghiệp vụ (business logic) và truy cập dữ liệu (data access). Sau khi chia tách, presentation layer sẽ thực hiện các cuộc gọi remote đến ứng dụng logic nghiệp vụ. Sơ đồ sau đây cho thấy kiến trúc trước và sau khi tái cấu trúc.
+
+image::refactoring.png[]
+Tách một khối bằng cách này có hai lợi ích chính. Nó cho phép bạn phát triển, triển khai và mở rộng hai ứng dụng độc lập với nhau. Đặc biệt, nó cho phép các developer phát triển presentation layer nhanh chóng trên giao diện người dùng và dễ dàng thực hiện A/B testing. Một lợi ích khác của phương pháp này là nó cung cấp các remote API có thể được gọi bởi các microservice mà bạn đang phát triển.
+
+Tuy nhiên, chiến lược này chỉ là một phần của giải pháp. Bạn cần phải sử dụng chiến lược thứ ba để hoàn toàn chia nhỏ khối thành các service.
+
+==== Chia nhỏ khối thành các service
+Chiến lược tái cấu trúc thứ ba là chuyển các mô-đun hiện có trong khối đơn thành các microservice độc lập. Mỗi khi bạn trích xuất một mô-đun và biến nó thành một service, khối sẽ co lại. Bạn sẽ tiến hành chuyển đổi đủ mô-đun cho đến khi nó biến mất hoàn toàn hoặc nó trở nên đủ nhỏ để trở thành một service khác.
+
+===== Ưu tiên các module cần chuyển đổi thành service
+Một ứng dụng nguyên khối phức tạp lớn bao gồm hàng chục hoặc hàng trăm mô-đun, tất cả đều là các ứng cử viên trong việc chuyển đổi. Tìm ra mô-đun để chuyển đổi đầu tiên thường là thử thách, nhưng rất quan trọng. *Một cách tiếp cận tốt là bắt đầu với một vài mô-đun dễ dàng trích xuất*. Điều này sẽ cung cấp cho bạn kinh nghiệm với microservices nói chung và quá trình chuyển đổi nói riêng. Sau đó, bạn nên trích xuất các mô-đun mang lại lợi ích lớn nhất.
+
+Chuyển đổi một mô-đun thành một service thường tốn thời gian. *Bạn cần xếp hạng các mô-đun theo lợi ích sẽ nhận được*. Sẽ tốt hơn nếu trích xuất các mô-đun thay đổi thường xuyên trước. Một khi bạn đã chuyển đổi một mô-đun thành một service, bạn có thể phát triển và triển khai nó một cách độc lập với nguyên khối, và tất nhiên, từ đây có thể đẩy nhanh tốc độ phát triển của các mô-đun đã được trích xuất thành công.
+
+*Hoặc là trích xuất các mô-đun có yêu cầu tài nguyên khác biệt đáng kể so với các phần còn lại của khối*. Ví dụ để biến một mô-đun có sử dụng in-memory database thành một service, và sau đó có thể được triển khai trên máy chủ có nhiều memory. Tương tự như vậy, trích xuất các mô-đun thực hiện các thuật toán tính toán tốn kém, sau đó service này có thể được triển khai trên các máy chủ có nhiều CPU. Bằng cách chuyển các mô-đun với các yêu cầu tài nguyên cụ thể thành các service, bạn có thể làm cho ứng dụng dễ dàng hơn trong việc mở rộng quy mô.
+
+Khi tìm ra các mô-đun để trích xuất, hãy tìm ra các *coarse-grained boundaries* (hay còn gọi là seams – các đường nối). Chúng làm cho việc chuyển các mô-đun thành service trở nên dễ dàng và ít chi phí hơn. Một ví dụ về ranh giới như vậy là một mô-đun chỉ giao tiếp với phần còn lại của ứng dụng thông qua các synchronous messages. Nó có thể tương đối tốn ít chi phí và dễ dàng biến mô-đun đó thành một service nhỏ.
+
+===== Cách trích xuất một module
+Bước đầu tiên để trích xuất một mô-đun là xác định coarse-grained interface giữa mô-đun và khối. Nó hầu như là một API hai chiều, vì khối sẽ cần dữ liệu thuộc sở hữu của service và ngược lại. Sẽ có lúc bạn cần phải thực hiện các thay đổi lớn về mã nguồn để phá vỡ các phụ thuộc này. Sơ đồ sau đây cho thấy việc tái cấu trúc.
+
+Khi bạn triển khai coarse-grained interface, bạn sẽ biến mô-đun thành một service độc lập. Để thực hiện điều đó, bạn phải viết mã để cho phép nguyên khối và service giao tiếp thông qua một API sử dụng IPC. Sơ đồ sau đây cho thấy kiến trúc trước, trong và sau khi tái cấu trúc.
+
+image::extract-module.png[]
+Trong ví dụ này, Mô-đun Z là mô-đun ứng cử viên cần trích xuất. Các thành phần của nó được sử dụng bởi Module X và nó sử dụng Module Y. Bước tái cấu trúc đầu tiên là định nghĩa một cặp các coarse-grained APIs. Interface đầu tiên được sử dụng bởi Module X để gọi Module Z. Interface thứ hai được sử dụng bởi Module Z để gọi Module Y.
+
+Bước tái cấu trúc thứ hai biến mô-đun thành một service độc lập. Các interface trong và ngoài được thực hiện bằng cơ chế IPC. Có thể sẽ cần phải xây dựng service bằng cách kết hợp Module Z với https://microservices.io/patterns/microservice-chassis.html[Microservice Chassis framework] để xử lý các vấn đề như service discovery.
+
+Khi đã trích xuất một mô-đun thành công thành các service sẽ cho phép nó phát triển, triển khai và thu nhỏ độc lập với khối đơn và với bất kỳ service nào khác. Thậm chí có thể viết lại service từ đầu; trong trường hợp này, mã nguồn dùng để tích hợp service với khối đơn trở thành anti-corruption layer giúp chuyển đổi giữa hai domain model. Theo thời gian, khối đá sẽ co lại và sẽ có một số lượng microservices sẽ ngày càng tăng lên.
+
+== Microservice Platform
+=== Spring boot, Spring cloud, Netflix OSS
+https://spring.io/projects/spring-boot[Spring Boot] là một dự án nổi bật trong hệ sinh thái Spring Framework. Nếu như trước đây, công đoạn khởi tạo một dự án Spring khá vất vả từ việc khai báo các dependency trong file pom.xml cho đến cấu hình bằng XML hoặc annotation phức tạp, thì giờ đây với Spring Boot, chúng ta có thể tạo các ứng dụng Spring một cách nhanh chóng và cấu hình cũng đơn giản hơn.
+
+Như các bạn biết, để cấu hình, setup một project web đơn giản cũng tốn kha khá thời gian, vậy để setup, quản lý cấu hình, dependency cho một Microservices application sẽ còn phức tạp hơn nhiều. Tuy nhiên với Spring Boot, bạn sẽ thấy nó giúp ích khá nhiều cho chúng ta. Có thể coi Spring Boot như một project configuration manager của bạn, hãy cho Spring Boot biết bạn muốn tạo ứng dụng gồm những tính năng gì, ví dụ như: Web service, Web MVC, Microservices với API Gateway, Load balancer và Service Discovery, Circuit breaker,… Spring Boot sẽ tự biết làm gì để tạo ra project skeleton với đầy đủ những thứ bạn cần, và thậm chí, bạn có thể bấm Run luôn cái project mới tạo ra
+
+https://spring.io/projects/spring-cloud[Spring Cloud] là nền tảng khá mới mẻ trong gia đình Spring.io dùng để xây dựng microservice một cách nhanh chóng. Spring Cloud cung cấp các công cụ cho các developer để nhanh chóng xây dựng một số common patterns trong các hệ thống phân tán (e.g. configuration management, service discovery, circuit breakers, intelligent routing, micro-proxy, control bus, one-time tokens, global locks, leadership election, distributed sessions, cluster state). Chúng sẽ hoạt động tốt trong bất kỳ môi trường phân tán nào, bao gồm máy tính xách tay của chính developer, các data center hoặc trên cloud.
+
+Bản thân hệ sinh thái Spring không tự build hết tất cả các viên gạch cần để xây dựng ứng dụng Microservices. Thay vào đó, có một kho gạch dành cho Microservices được Netflix ban đầu phát triển trong nội bộ của họ để xây dựng service xem phim trực tuyến nổi tiếng của họ và sau đó public ra dưới dạng open source với cái tên https://netflix.github.io/[Netflix OSS (Open Source Software)]. Và Spring đơn giản chỉ làm nhiệm vụ wrap chúng lại và dùng trong hệ sinh thái của Spring (tất nhiên Spring nó còn wrap nhiều thằng khác nữa). Bằng cách kết hợp Spring Boot, Spring Cloud và Netflix OSS sẽ đủ cung cấp các công cụ và nguyên liệu cần thiết nhất để giúp bạn có thể nhanh chóng và dễ dàng xây dựng các Microservices của mình.
+
+
+|===
+|Component |Tool
+
+|Service Discovery
+|Netflix Eureka
+
+|Dynamic Routing, load balancer
+|Netflix Ribbon
+
+|Circuit Breaker
+|Netflix Hystrix
+
+|Monitoring
+|Hystrix dashboard, Turbine
+
+|Edge Server
+|Spring cloud gateway
+|Central Configuration Server
+|Spring cloud config server
+|OAuth2 Protected APIs
+|Spring Cloud, Spring security OAuth2
+|Centralised log analyses
+|ELK
+|===
+
+=== Service Discovery
+Service Discovery cũng tương tự như DNS (Domain Name Service). Thay vì phải sử dụng địa chỉ IP khó nhớ hoặc có thể biến động, các client, thiết bị, service sẽ tìm thấy nhau bằng tên dễ nhớ và có một service chung để chuyển tên dễ nhớ thành địa chỉ IP. Spring Cloud có thư viện Eureka Service Discovery để giúp các service REST, Web đăng ký với nó sau đó giúp các service này tìm kiếm nhau, kết nối với nhau đơn giản hơn. Eureka là thư viện do Netflix viết từ đầu, sau đó được team Spring thuộc Pivotal và cộng đồng tham gia phát triển tiếp.
+
+==== Eureka Server
+Đây là một máy chủ dùng để quản lý, đặt tên cho các service, hay còn gọi là service registry. Mỗi service sẽ được đăng ký với Eureka và sẽ ping cho Eureka để đảm bảo chúng vẫn hoạt động. Nếu Eureka server không nhận được bất kỳ thông báo nào từ service thì service đó sẽ bị gỡ khỏi Eureka một cách tự động.
+
+Để tạo Eureka server, chúng ta sẽ dùng Maven để quản lý các dependencies. Lưu ý khác với kiến trúc monolithic, mỗi component trong microservice được dựng một cách độc lập. Do đó chúng ta sẽ tạo mới một project Spring Boot và khai báo file pom.xml như sau:
+
+[source, xml]
+----
+    <parent>
+        <artifactId>microservice-platform</artifactId>
+        <groupId>com.microtech</groupId>
+        <version>1.0.0</version>
+    </parent>
+    ...
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-server</artifactId>
+        </dependency>
+    </dependencies>
+----
+Trong thư mục resource, tạo file cấu hình application.yml:
+
+[source, yaml]
+----
+server:
+  port: 8761
+spring:
+  application:
+    name: eureka-server
+eureka:
+  instance:
+    hostname: localhost
+  client:
+    fetch-registry: false
+    register-with-eureka: false
+  server:
+    enable-self-preservation: false
+----
+Cuối cùng, trong class main của project, chúng ta sẽ khai báo đây là một Eureka server bằng annotation @EnableEurekaServer:
+
+[source, java]
+----
+@EnableEurekaServer
+@SpringBootApplication
+public class EurekaServerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(EurekaServerApplication.class, args);
+    }
+
+}
+----
+Eureka server lắng nghe ở cổng 8761. Vì đây là server nên phần Eureka client chúng ta không cần đăng ký registerWithEureka: false và cũng không cần lấy danh sách các service đăng ký về fetchRegistry: false
+
+Start project rồi dùng trình duyệt vào địa chỉ http://localhost:8761/
+
+image::eureka-1.png[]
+
+==== Discovery client
+Các Discovery client service là một service độc lập trong kiến trúc microservice. Mỗi client service chỉ thực hiện duy nhất một nghiệp vụ nào đó trong hệ thống như thanh toán, tài khoản, thông báo, xác thực, cấu hình,… Chúng ta sẽ xây dựng customer service như một service demo
+
+Cũng như Eureka Server, chúng ta sẽ tạo một project Spring Boot mới nhưng sử dụng Discovery Client trong file pom.xml:
+
+[source, xml]
+----
+    <parent>
+        <groupId>com.microtech</groupId>
+        <artifactId>micro-http-demo</artifactId>
+        <version>1.0.0</version>
+    </parent>
+    ...
+
+    <dependencies>
+        ...
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+        </dependency>
+    </dependencies>
+----
+Trong file appication.properties chúng ta sẽ ghi lại địa chỉ của Eureka server:
+
+[source, yaml]
+----
+server:
+  port: 0
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${SPRING_EUREKA:http://localhost:8761/eureka}
+  instance:
+    preferIpAddress: true
+----
+.Giải thích:
+- `server.port = 0` cho phép chọn ngẫu nhiên port mà REST server phục vụ.
+- `eureka.client.serviceUrl.defaultZone` khai báo đường dẫn đến Eureka Server. http://localhost:8761/eureka.
+- `instance.preferIpAddress: true`: yêu cầu Eureka server trả về danh sách service với địa chỉ IP của mỗi service thay vì tên miền nếu có. Việc này giúp kết nối sẽ nhanh hơn, bỏ qua giai đoạn dịch từ tên miền sang IP nhờ DNS.
+
+Sau đó để chỉ cho Spring Boot biết đây là một Discovery client, chúng ta dùng annotation `@EnableDiscoveryClient` trong class main:
+
+[source, java]
+----
+@SpringBootApplication
+@EnableDiscoveryClient
+public class CustomersServiceApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(CustomersServiceApplication.class, args);
+	}
+}
+----
+Hãy biên dịch và chạy, rồi quay lại đường dẫn http://localhost:8761 refresh sẽ thấy customer service đã đăng ký với Eureka
+
+image::eureka-2.png[]
+
+==== Những lựa chọn khác thay thế Eureka Service Discovery
+Netflix Eureka được tạo ra vào thời kỳ 2008-2010, khi Netflix chuyển từ mô hình Monolithic sang Microservice. Khi đó Docker, Kubernetes chưa có hay phổ biến như hiện nay. Thậm chí khái niệm Mesh service chưa có nốt. Giờ đây Kubernetes cũng đã có tính năng Service Discovery. Điểm khác biệt là Kubernetes Service Discovery áp dụng cho mọi ngôn ngữ lập trình, framework, và không cần phải tác động vào code của từng service. Rồi service mesh ra đời, với khái niệm Side Car (thùng xe ghép vào xe motor), giúp lập trình không phải cấu hình, sửa đổi code ứng dụng mà vẫn có được tính năng service discovery thậm chí còn thu thập thông tin sức khoẻ từng service để báo cáo tập trung.
+
+==== Config Server
+Trong các hệ thống phân tán, Spring Cloud Config được dùng cho mục đích _externalized configuration_ và _centralized configuration_ - tách biệt và tập trung các property của các ứng dụng Spring tại một nơi. Đây là các property có giá trị khác nhau trên các môi trường phát triển (dev, staging, product, ...).
+
+Spring Cloud Config hoạt động theo mô hình kiến trúc client - server, bao gồm: Spring Cloud Config Server và Spring Cloud Config Client.
+
+.Spring Cloud Config Server
+Các property của các ứng dụng Spring (được lưu trong các property source như file properties hoặc file YAML) được tập trung trên một hệ thống backend: Git repository (mặc định), File System, Vault, JDBC, Redis, ...
+
+Nhiệm vụ của Spring Config Server là pull các property này về và dùng EnvironmentRepository để lưu trữ. EnvironmentRepository cung cấp các đối tượng Spring Environment.
+
+Sau đó cung cấp các property cho Config Client thông qua các HTTP resource-based API (HTTP Method là GET).
+
+.Spring Cloud Config Client
+
+Đây chính là các ứng dụng Spring đã tách biệt các property. Khi startup, Config Client sẽ đọc các property từ API của Config Server và khởi tạo đối tượng Environment với property source phù hợp.
+
+Các API này có các path sau:
+
+[source]
+----
+/{application}/{profile}[/{label}]
+/{application}-{profile}.yml
+/{label}/{application}-{profile}.yml
+/{application}-{profile}.properties
+/{label}/{application}-{profile}.properties
+----
+
+.Trong đó:
+- `{application}`: map với giá trị spring.application.name trong file bootstrap.yml của Config Client. Hiểu theo một cách khác đây chính là giá trị spring.config.name của Config Client.
+- `{profile}`: map với giá trị spring.profiles.active trong file bootstrap.yml của Config Client. Nếu có nhiều active profile thì các active profile sẽ được ngăn cách nhau bởi dấu phẩy. Giá trị mặc định là default.
+- `{label}` (tùy chọn): Git label dùng để gán nhãn version. Giá trị mặc định là master.
+
+.Ví dụ:
+
+Git repository có 2 property source là `your-service.yml` và `your-service-dev.yml`. Như vậy:
+
+- `your-service.yml`: có `{application}` là your-service và `{profile}` là default. Config Server sẽ cung cấp API `http://localhost:8888/your-service/default` để Config Client đọc được các property từ property source `your-service.yml` đặt trên hệ thống backend.
+- `your-service-dev.yml`: có `{application}` là `your-service` và `{profile}` là `dev`. Config Server sẽ cung cấp API ``http://localhost:8888/your-service/dev ``để Config Client đọc được các property từ property source `your-service-dev.yml` đặt trên hệ thống backend.
+
+.Ví dụ, khi call API `http://localhost:8888/your-service/default`, sẽ trả về một chuỗi JSON như sau:
+
+[source, json]
+----
+{
+    "name": "your-service",
+    "profiles": [
+        "default"
+    ],
+    "label": null,
+    "version": "dc63ead663b4acdde42c66195d29044ed08bf89e",
+    "state": null,
+    "propertySources": [
+        {
+            "name": "https://github.com/your-git-account/your-config-repository/your-service.yml",
+            "source": {
+              // This is properties from your-service.yml
+            }
+        }
+    ]
+}
+----
+
+==== Spring Cloud Config Server
+
+.Cấu hình dependency
+
+[source, xml]
+----
+    <parent>
+        <artifactId>microservice-platform</artifactId>
+        <groupId>com.microtech</groupId>
+        <version>1.0.0</version>
+    </parent>
+    ...
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-config-server</artifactId>
+        </dependency>
+        ...
+    </dependencies>
+----
+
+.Enable Config Server
+Config Server được nhúng bên trong một ứng dụng Spring Boot. Để enable Config Server, chúng ta sử dụng annotation `@EnableConfigServer`:
+
+[source, java]
+----
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cloud.config.server.EnableConfigServer;
+
+@EnableConfigServer
+@SpringBootApplication
+public class ConfigServerApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(ConfigServerApplication.class, args);
+    }
+
+}
+----
+
+.Cấu hình thông tin Git Backend
+
+[source, yaml]
+----
+spring:
+  cloud:
+    config:
+      server:
+        git:
+          uri: https://github.com/your-git-account/your-config-repository
+          username: user
+          password: secret
+          searchPaths: foo,bar*
+          timeout: 10
+----
+
+Trong đó:
+
+- `spring.cloud.config.server.git.uri:` URI của Git repository.
+- `spring.cloud.config.server.git.username:` username của Git account.
+- `spring.cloud.config.server.git.password:` password của Git account.
+- `spring.cloud.config.server.git.timeout:` timeout (đơn vị là giây) kết nối Git repository. Giá trị mặc định là 5 giây.
+- `spring.cloud.config.server.git.searchPaths`: các property source có thể đặt bên trong các thư mục con của Git repository.
+- `foo`: Config Server sẽ pull tất cả các property source bên trong thư mục foo.
+- `bar*`: Config Server sẽ pull tất cả các property source bên trong các thư mục có tên bắt đầu bằng bar.
+
+==== Spring Cloud Config Client
+
+.Dependency
+
+[source, xml]
+----
+    <parent>
+        <artifactId>microservice-platform</artifactId>
+        <groupId>com.microtech</groupId>
+        <version>1.0.0</version>
+    </parent>
+    ...
+    <dependencies>
+        ...
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-config</artifactId>
+        </dependency>
+        </dependency>
+    </dependencies>
+----
+
+.Cấu hình thông tin Config Server
+
+bootstrap.yml
+
+[source, yaml]
+----
+spring:
+  application:
+    name: foo
+  profiles:
+    active: dev,mysql
+  cloud:
+    config:
+      uri: http://localhost:8888
+      username: user
+      password: secret
+      request-read-timeout: 10
+----
+
+Trong đó:
+
+- `spring.cloud.config.uri`: URI của Config Server.
+- `spring.cloud.config.username`: username để xác thực nếu Config Server thiết lập HTTP Basic security.
+- `spring.cloud.config.password`: password để xác thực nếu Config Server thiết lập HTTP Basic security.
+- `spring.cloud.config.request-read-timeout`: timeout (đơn vị là giây) khi chờ đọc dữ liệu từ Config Server API. Giá trị mặc định là 0.
+
+.@RefreshScope
+Mặc định, các property sẽ chỉ được đọc một lần duy nhất khi Config Client startup. Tuy nhiên, với các bean cần cập nhật giá trị mới nhất từ Config Server, chúng ta có thể khai báo thêm annotation @RefreshScope
+
+[source, java]
+----
+@RefreshScope
+@RestController
+class MessageRestController {
+
+    @Value("${message:Hello default}")
+    private String message;
+
+    @RequestMapping("/message")
+    String getMessage() {
+        return this.message;
+    }
+}
+----
+
+==== Nhúng Config Server trong ứng dụng khác
+Trong một số trường hợp, chúng ta cần nhúng trực tiếp Config Server bên trong ứng dụng khác, thay vì để ứng dụng đó gọi trực tiếp đến một standalone Config Server. Ví dụ như nhúng Config Server vào trong Eureka Server
+
+Các bước để thực hiện điều này là:
+
+.Bước 1:
+Chúng ta chỉ cần dependency của Config Server mà thôi:
+`pom.xml`
+
+[source, xml]
+----
+<dependency>
+  <groupId>org.springframework.cloud</groupId>
+  <artifactId>spring-cloud-config-server</artifactId>
+</dependency>
+----
+.Bước 2:
+Enable Config Server thông qua annotation `@EnableConfigServer.`
+
+.Bước 3:
+Trong bootstrap.yml, chúng ta cấu hình như sau:
+
+[source, yaml]
+----
+spring:
+  cloud:
+    config:
+      server:
+        bootstrap: true
+        git:
+          uri: https://github.com/your-git-account/your-config-repository
+          username: user
+          password: secret
+          searchPaths: foo,bar*
+          timeout: 10
+        prefix: config
+----
+Trong đó:
+
+- `spring.cloud.config.server.bootrap=true` => xác nhận ứng dụng tự nó cấu hình là Config Server. Việc này có thể làm chậm quá startup ứng dụng.
+- Để tránh conflict với context path hoặc server path của ứng dụng (có thể gây ra lỗi CSS chẳng hạn), chúng ta sẽ bổ sung giá trị `spring.cloud.config.server.prefix` (mặc định là rỗng): đây là prefix của các API của Config Server. Ví dụ: Nếu `spring.cloud.config.server.prefix=config`, thì API `http://localhost:8888/your-service/default` sẽ được chuyển thành `http://localhost:8761/config/your-service/default`. Trong đó `localhost:8761` là host và port của Eureka Server.
+
+.Bước 4:
+Xóa các cấu hình liên quan đến Config Server trong file application.yml vì các cấu hình này là không cần thiết.
+
+=== Gateway
+
+.Một API Gateway thường sẽ có những chứng năng chính sau đây:
+- Routing: chuyển hướng các request đến service (microservice) đứng sau gateway
+- Load Balacing: phân tải. Một API Gateway có thể đếm được số request đến và phân phối cho nhiều service cùng chức năng. Việc tạo ra các service cùng chức năng sẽ là việc của Docker Swarm hay Kubernetes.
+- Authentication - Authorization: API Gateway vẫn cần phối hợp với microservice chuyên quản lý người dùng, xác thực, phân quyền. Tuy nhiên API Gateway làm nhiệm vụ xác thực thì chúng ta sớm đạt mục tiêu Single Sign On (đăng nhập một lần).
+- Prefilter: tiền xử lý các request đến, có thể loại bỏ, ngăn chặn hoặc thêm / bớt các trường trong header, giải mã token
+- Postfilter: hậu xử lý các response từ microservice trả về.
+- Rate Limiting: khống chế số lượng truy cập
+- Circuit Breaker: cầu dao mở mạch khi xuất hiện lỗi từ các microservice phía sau. Khi mọi thứ trở lại bình thường thì đóng mạch.
+- Logging: thu thập thông tin.
+
+.Vài điều bạn cần biết về API Gateway
+
+- Một API Gateway mà làm quá nhiều việc (hay nó phức tạp, cồng kềnh) thì tốc độ chuyển hướng sẽ chậm lại
+- Có thể nhân bản API Gateway được, điều này sẽ giúp xử lý được nhiều request hơn.
+- Java chưa hẳn đã là ngôn ngữ phù hợp nhất để tạo ra API Gateway. Golang hiện nay được sử dụng nhiều tạo ra các phần mềm chuyên định tuyến, chuyển hướng mạng, tốc độ nhanh, tốn ít tài nguyên.
+
+==== Spring Cloud API Gateway
+.Dependency
+
+[source, xml]
+----
+<parent>
+        <artifactId>microservice-platform</artifactId>
+        <groupId>com.microtech</groupId>
+        <version>1.0.0</version>
+    </parent>
+    ...
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.cloud</groupId>
+            <artifactId>spring-cloud-starter-gateway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webflux</artifactId>
+        </dependency>
+        ...
+    </dependencies>
+----
+
+.Có 2 cách để cấu hình Spring Cloud API Gateway:
+- Sử dụng file cấu hình application.properties hoặc application.yml.
+- Lập trình code để cấu hình.
+
+Hãy ưu tiên sử dụng file cấu hình, bởi nó dễ hiểu, dễ sửa, và có thể kết hợp với Spring Cloud Config để tập trung hoá cấu hình. Chúng ta chỉ dùng code để viết bổ sung các filter, hoặc logic phức tạp. Hãy ưu tiên sự đơn giản. Vì càng đơn giản thì càng dễ nhân bản (scale out).
+
+.Cấu hình Spring Cloud Gateway bằng application.yml
+
+[source, yaml]
+----
+server:
+  port: 8301
+
+spring:
+  cloud:
+    gateway:
+      routes:
+        - id: customers-service
+          uri: http://localhost:8081/
+          predicates:
+          - Path=/customers-service/**
+        - id: visits-service
+          uri: http://localhost:8082/
+          predicates:
+          - Path=/visits-service/**
+----
+Spring Boot Cloud Gateway sẽ khởi động Netty rồi lắng nghe ở cổng 8301. Khác với ứng dụng Spring Boot thông thường dùng TomCat. SB Cloud Gateway sử dụng cơ chế non-blocking do đó mặc định dùng Netty.
+
+- `routes`: cài đặt các quy tắc phân luồng. Mỗi luồng có thể chuyển đến một microservice ở phía sau (tiếng Anh gọi là down stream - hạ lưu)
+- `id`: đặt tên phân biệt từng luồng.
+- `uri`: lưu địa chỉ của microservice
+- `predicates`: lưu các quy tắc khớp các đường dẫn. Ví dụ /customers-service/** sẽ gom tất cả các đường dẫn chúng thành phần đường dẫn đầu tiên là "customers-service"
+
+Khởi động Spring Cloud Gateway rồi truy cập đường dẫn http://localhost:8301/customers-service/owners, bạn sẽ nhận được kết quả trả về như vào đường dẫn http://localhost:8081/owners
+
+=== Authorization Server
+==== OAuth2 là gì?
+
+OAuth2 hay Open Authentication thực ra nó là một phương thức chứng thực, xây dựng ra để các ứng dụng có thể chia sẻ tài nguyên cho nhau mà không cần chia sẻ thông tin tài khoản (username và password). OAuth2 đảm nhận 2 việc Authentication (Xác thực người dùng) và Authorization (Ủy quyền truy cập vào tài nguyên)
+
+image::oauth2.png[]
+
+Nhìn vào hình ảnh trên, ta có thể thấy giao thức OAuth2 được thực hiện qua 2 bên là Service API - cung cấp service xác thực và ủy quyền sử dụng tài nguyên và Application - ứng dụng bên thứ 3 muốn lấy tài nguyên của Resource Owner. Ngoài ra, còn có một số khái niệm quan trọng như:
+
+- Resource Owner: Là những người muốn ủy quyền cho phép Application truy cập vào tài khoản của mình. Application có thể lấy thông tin nhưng sẽ bị giới hạn bởi scope được cấp phép.
+- Authorization Server: Có nhiệm vụ kiểm tra và xác thực thông tin đăng nhập của user, sau đó cung cấp một chuỗi gọi là Access Token để Client có thể xác thực về sau.
+- Resource Server: Là nơi lưu trữ tài nguyên của User và bảo mật tài nguyên cho User.
+
+.Luồng hoạt động
+1. Application gửi yêu cầu ủy quyền truy cập vào Resource Server.
+2. Nếu User ủy quyền cho phép Application truy cập vào tài nguyên, thì sẽ nhận được một "giẩy ủy quyền" từ User.
+3. Application gửi thông tin đăng nhập kèm theo "giẩy ủy quyền" tới Authorization Server.
+4. Nếu thông tin gửi đi từ Application là hợp lệ, Authorization Server sẽ trả về một đoạn chuỗi gọi là access_token.
+5. Application muốn truy cập tài nguyên của Resource Server thì phải gửi yêu cầu kèm theo đó là chuỗi access_token vừa nhận được.
+6. Nếu access_token hợp lệ, Resource Server sẽ trả về tài nguyên mà Application đang yêu cầu.
+
+.Authorization Grant
+Để lấy được access_token thì phải qua bước ủy quyền và xác thực. Loại ủy quyền (Authorization Grant) phụ thuộc vào phương thức mà Application sử dụng ủy quyền. Đối với OAuth2, định nghĩa có 4 loại ủy quyền sau:
+
+- Authorization Code: Thường sử dụng trong các server-side application.
+- Resource Owner Password Credentials: Sử dụng với các ứng dụng được tin cậy
+- Client Credentials: Sử dụng truy cập với các ứng dụng thông qua API
+- Implicit: Sử dụng trong các Mobile App hoặc Web App
+
+==== Cấu hình Authorization Server
+
+.Dependency
+
+[source, xml]
+----
+    <parent>
+        <artifactId>microservice-platform</artifactId>
+        <groupId>com.microtech</groupId>
+        <version>1.0.0</version>
+    </parent>
+    ...
+
+    <dependencies>
+        <dependency>
+            <groupId>com.microtech</groupId>
+            <artifactId>micro-security</artifactId>
+        </dependency>
+    </dependencies>
+----
+
+.Cấu hình authorization server bằng cách sử dụng @EnableAuthorizationServer
+
+[source, java]
+----
+
+@Configuration
+@EnableAuthorizationServer
+@RequiredArgsConstructor
+public class AuthorizationServerConfigure extends AuthorizationServerConfigurerAdapter {
+
+    private final AuthenticationManager authenticationManager;
+    private final UserDetailsService userDetailService;
+    private final PasswordEncoder passwordEncoder;
+    private final OAuthProperties properties;
+    private final RedisAuthenticationCodeService authenticationCodeService;
+    private final RedisClientDetailsService redisClientDetailsService;
+    private final RedisConnectionFactory redisConnectionFactory;
+
+    @Override
+    public void configure(ClientDetailsServiceConfigurer clients) {
+        clients.withClientDetails(redisClientDetailsService);
+    }
+
+    @Override
+    public void configure(AuthorizationServerEndpointsConfigurer endpoints) {
+        endpoints.tokenStore(tokenStore())
+                .userDetailsService(userDetailService)
+                .authorizationCodeServices(authenticationCodeService)
+                .authenticationManager(authenticationManager);
+        if (properties.getEnableJwt()) {
+            endpoints.accessTokenConverter(jwtAccessTokenConverter());
+        }
+    }
+
+    @Override
+    public void configure(final AuthorizationServerSecurityConfigurer oauthServer) {
+        oauthServer.tokenKeyAccess("permitAll()")
+            .checkTokenAccess("isAuthenticated()")
+            .passwordEncoder(passwordEncoder);
+    }
+
+    @Bean
+    public TokenStore tokenStore() {
+        if (properties.getEnableJwt()) {
+            return new JwtTokenStore(jwtAccessTokenConverter());
+        } else {
+            RedisTokenStore redisTokenStore = new RedisTokenStore(redisConnectionFactory);
+            redisTokenStore.setAuthenticationKeyGenerator(oAuth2Authentication -> UUID.randomUUID().toString());
+            return redisTokenStore;
+        }
+    }
+
+    @Bean
+    @Primary
+    public DefaultTokenServices defaultTokenServices() {
+        DefaultTokenServices defaultTokenServices = new DefaultTokenServices();
+        defaultTokenServices.setTokenStore(tokenStore());
+        defaultTokenServices.setSupportRefreshToken(true);
+
+        if (properties.getEnableJwt()) {
+            TokenEnhancerChain tokenEnhancerChain = new TokenEnhancerChain();
+            tokenEnhancerChain.setTokenEnhancers(
+                Collections.singletonList(jwtAccessTokenConverter()));
+            defaultTokenServices.setTokenEnhancer(tokenEnhancerChain);
+        }
+
+        defaultTokenServices.setReuseRefreshToken(false);
+        defaultTokenServices.setAccessTokenValiditySeconds(properties.getDefaultAccessTokenTimeout());
+        defaultTokenServices.setRefreshTokenValiditySeconds(properties.getDefaultRefreshTokenTimeout());
+        defaultTokenServices.setClientDetailsService(redisClientDetailsService);
+        return defaultTokenServices;
+    }
+
+    @Bean
+    public JwtAccessTokenConverter jwtAccessTokenConverter() {
+        JwtAccessTokenConverter accessTokenConverter = new JwtAccessTokenConverter();
+        DefaultAccessTokenConverter defaultAccessTokenConverter = (DefaultAccessTokenConverter) accessTokenConverter.getAccessTokenConverter();
+        DefaultUserAuthenticationConverter userAuthenticationConverter = new DefaultUserAuthenticationConverter();
+        userAuthenticationConverter.setUserDetailsService(userDetailService);
+        defaultAccessTokenConverter.setUserTokenConverter(userAuthenticationConverter);
+        KeyStoreKeyFactory keyStoreKeyFactory = new KeyStoreKeyFactory(new ClassPathResource("keypair.jks"),
+            "MU9ZFdQyX4Q6".toCharArray());
+        accessTokenConverter.setKeyPair(keyStoreKeyFactory.getKeyPair("oauth2-server-jwt"));
+        return accessTokenConverter;
+    }
+
+    @Bean
+    public ResourceOwnerPasswordTokenGranter resourceOwnerPasswordTokenGranter(AuthenticationManager authenticationManager, OAuth2RequestFactory oAuth2RequestFactory) {
+        DefaultTokenServices defaultTokenServices = defaultTokenServices();
+        if (properties.getEnableJwt()) {
+            defaultTokenServices.setTokenEnhancer(jwtAccessTokenConverter());
+        }
+        return new ResourceOwnerPasswordTokenGranter(authenticationManager, defaultTokenServices, redisClientDetailsService, oAuth2RequestFactory);
+    }
+
+    @Bean
+    public DefaultOAuth2RequestFactory oAuth2RequestFactory() {
+        return new DefaultOAuth2RequestFactory(redisClientDetailsService);
+    }
+
+}
+
+----
+
+Trong đó:
+
+- Authorization server được tùy chỉnh bằng cách mở rộng class `AuthorizationServerConfigurerAdapter` cung cấp các phương thức rỗng cho interface `AuthorizationServerConfigurer`.
+
+- `tokenStore` ở đây là nơi lưu trữ token `RedisTokenStore` có nghĩa là sẽ cache token vào redis nếu không sẽ lấy ra từ database
+
+.Cấu hình Security
+
+[source, java]
+----
+@Configuration
+@RequiredArgsConstructor
+public class CloudSecurityConfigure extends WebSecurityConfigurerAdapter {
+
+  private final UserDetailsService userDetailService;
+
+  @Bean
+  @Override
+  public AuthenticationManager authenticationManagerBean() throws Exception {
+    return super.authenticationManagerBean();
+  }
+
+  @Override
+  protected void configure(HttpSecurity http) throws Exception {
+    http
+        .requestMatchers()
+        .antMatchers("/**", "/login")
+        .mvcMatchers("/.well-known/jwks.json")
+        .and()
+        .authorizeRequests()
+        .antMatchers("/**").authenticated()
+        .mvcMatchers("/.well-known/jwks.json").permitAll()
+        .and()
+        .formLogin()
+        .loginPage("/login")
+        .loginProcessingUrl("/login")
+        .permitAll()
+        .and().csrf().disable()
+        .httpBasic().disable();
+  }
+
+  @Override
+  protected void configure(AuthenticationManagerBuilder auth) throws Exception {
+    auth.userDetailsService(userDetailService).passwordEncoder(passwordEncoder());
+  }
+
+  @Bean
+  public PasswordEncoder passwordEncoder() {
+    return new BCryptPasswordEncoder();
+  }
+
+}
+----
+
+.Thực hiện get token
+
+[source, bash]
+----
+curl --location --request POST 'http://localhost:8101/oauth/token?grant_type=password&username=admin&password=123456a@' \
+--header 'Authorization: Basic ZGVtby1jbGllbnQ6MTIzNDU2YUA='
+----
+
+hoặc có thể sử dụng postman, kết quả nhận được là thông tin token
+
+image::get-token.png[]
+
+==== Config Resource Server
+
+.Tại đây, cần cung cấp một resource_id cho ứng dụng, nếu không ứng dụng sẽ hiểu dùng resource_id của Spring Boot.
+
+[source, java]
+----
+
+@EnableResourceServer
+@RequiredArgsConstructor
+public class OAuth2JwtResourceServerConfiguration extends  ResourceServerConfigurerAdapter {
+    private final ResourceServerProperties resource;
+    @Override
+    public void configure(final ResourceServerSecurityConfigurer config) {
+        config.resourceId(resource.getResourceId())
+                .tokenServices(jwtTokenServices());
+    }
+    ...
+}
+----
+
+.Cấu hình Security cho resource
+
+[source, java]
+----
+    ...
+    @Override
+    public void configure(final HttpSecurity http) throws Exception {
+        http.authorizeRequests().antMatchers("/login").permitAll()
+                .antMatchers("/").permitAll()
+                .antMatchers(whiteList).permitAll()
+                .anyRequest().authenticated()
+                .and().formLogin().permitAll()
+                .and().csrf().disable();
+    }
+    ...
+----
+
+=== Eventuate Tram Framework
+Eventuate là tập hợp các framework giúp implement Saga và CQRS pattern một cách dễ dàng
+
+.Eventuate Framework
+[#img-Eventuate_Frameworks.png]
+[caption="Hình 7. "]
+image::Eventuate_Frameworks.png[]
+
+Eventuate bao gồm các framework sau:
+
+* Eventuate Tram Sagas - Một framework giúp implemement saga dựa trên orchestration
+* Eventuate Tram - Một message framework dựa trên transaction
+* Eventuate Local - Một event sourcing framework
+
+Hiện tại thì nó hỗ trọ các loại database sau: `Transaction log tailing` ( MySQL, Postgres) và `Polling`. Và các loại message broker sau: `Apache Kafka, ActiveMQ, RabbitMQ, Redis`
+
+==== JavaDocs
+
+Tham khảo ở link:https://eventuate.io/docs/javadoc/eventuate-tram/eventuate-tram.html[đây]
+
+==== Transactional message
+Eventuate Tram cung cấp các API cho việc nhận và gửi các message như một phần của database transaction
+
+===== Gửi các message
+Sử dụng `MessageProducer`:
+[source,java]
+----
+public abstract class AbstractTramMessageTest {
+
+  @Autowired
+  private MessageProducer messageProducer;
+
+  @Test
+  public void shouldReceiveMessage() {
+    ...
+    messageProducer.send(destination, MessageBuilder.withPayload(payload).build());
+    ...
+  }
+----
+
+===== Nhận message
+Sử dụng `MessageConsumer`
+
+[source,java]
+----
+public abstract class AbstractTramMessageTest {
+
+  @Autowired
+  private MessageConsumer messageConsumer;
+
+  @Test
+  public void shouldReceiveMessage() throws InterruptedException {
+    messageConsumer.subscribe(subscriberId, Collections.singleton(destination), this::handleMessage);
+    ...
+  }
+
+  private void handleMessage(Message message) {
+    ...
+  }
+}
+----
+
+==== Message interceptor
+
+Các service có thể định nghĩa 1 hoặc nhiều các `Message intercepter` để thêm vào các đoạn code xử lý logic trước mỗi step xử lý của message (VD: thêm các custom header vào message).
+Một `Message intercepter` phải implement interface `MessageInterceptor`:
+
+[source,java]
+----
+public interface MessageInterceptor {
+
+  default void preSend(Message message) {}
+  default void postSend(Message message, Exception e) {}
+
+  default void preReceive(Message message) {}
+  default void preHandle(String subscriberId, Message message) {}
+  default void postHandle(String subscriberId, Message message, Throwable throwable) {}
+  default void postReceive(Message message) {}
+
+}
+----
+
+==== Message handler decorator
+
+Các `Decorator` này tương đương với các `Servlet Filter` và chúng sẽ được gọi khi xử lý 1 message. Một `Decorator` phải implement interface `MessageHandlerDecorator`:
+
+[source,java]
+----
+public interface MessageHandlerDecorator
+     extends BiConsumer<SubscriberIdAndMessage, MessageHandlerDecoratorChain> {
+  int getOrder();
+}
+----
+
+Các `Decorator` sẽ được `Application Context` gọi theo thứ tự định nghĩa bởi method `getOrder()`.
+
+==== Idempotent message consumer
+
+Message Broker (VD: Kafka) có thể delivery message nhiều hơn 1 lần, vì thế các message consumer phải là `idempotent`. Một vài message consumer mà bản thân chúng đã là `idempotent` như việc chỉ gán giá trị `account.balance = event.newBalance` và chúng hoàn toàn có thể lặp lại việc xử lý mà không hề gây ra lỗi. Tuy nhiên nếu message consumer thực hiện việc gán giá trị `account.balance += event.amount` thì sẽ gây lỗi nếu chúng xử lý lặp messag, vì vậy chúng cần phải được `idempotent` bằng cách tracking việc message đã được xử lý hay chưa.
+`Eventuate Tram` implement điều này theo `strategy pattern` bằng cách định nghĩa interface `DuplicateMessageDetector`, và có sẵn một vài implement mặc định:
+
+* `SqlTableBasedDuplicateMessageDetector` - tracking các message đã xử lý theo trường `ID` trong bảng `RECEIVED_MESSAGES`. Việc xử lý logic của message sẽ được thực hiện trong cùng transaction mà được tạo ra trong class này.
+* `NoopDuplicateMessageDetector` - không thực hiện thêm thao tác gì cả (chỉ sử dụng nó trong trường hợp bản thân việc xử lý logic message đã là `idempotent`).
+* `TransactionalNoopDuplicateMessageDetector` - Nó không tracking các message đã xử lý nhưng việc xử lý logic message sẽ vẫn nằm trong transaction được tạo trong class này.
+
+WARNING: Nếu sử dụng `DuplicateMessageDetector` để quản lý transaction thì không được quản lý transaction (VD: @Transactional) trong hàm định nghĩa xử lý logic của message.
+
+==== Transactional domain event
+===== Publish các event
+Sử dụng interface `DomainEventPublisher`:
+
+[source,java]
+----
+public abstract class AbstractTramEventTest {
+
+  @Autowired
+  private DomainEventPublisher domainEventPublisher;
+
+  @Test
+  public void shouldReceiveEvent() throws InterruptedException {
+    long uniqueId = config.getUniqueId();
+    String accountId = ...;
+
+    DomainEvent domainEvent = new AccountDebited(...);
+
+    domainEventPublisher.publish("Account", accountId, Collections.singletonList(domainEvent));
+    ...
+----
+
+===== Consuming domain event
+Đầu tiên cần định nghĩa các `DomainEventHandlers`:
+
+[source,java]
+----
+public class TramEventTestEventConsumer {
+
+  public DomainEventHandlers domainEventHandlers() {
+    return DomainEventHandlersBuilder
+            .forAggregateType("Account")
+            .onEvent(AccountDebited.class, this::handleAccountDebited)
+            .build();
+  }
+
+  public void handleAccountDebited(DomainEventEnvelope<AccountDebited> event) {
+    ...
+  }
+
+}
+----
+
+Tiếp theo là config một bean `DomainEventDispatcher`:
+
+[source,java]
+----
+@Configuration
+public class AbstractTramEventTestConfiguration {
+
+  @Bean
+  public DomainEventDispatcher domainEventDispatcher(DomainEventDispatcherFactory domainEventDispatcherFactory,
+                                                     AbstractTramEventTestConfig config,
+                                                     TramEventTestEventConsumer target) {
+    return domainEventDispatcherFactory.make("eventDispatcherId" + config.getUniqueId(),
+                                             target.domainEventHandlers());
+  }
+  ...
+----
+
+==== Transactional command
+===== Send các command
+Sử dụng `CommandProducer`:
+
+[source,java]
+----
+public abstract class AbstractTramCommandTest {
+
+  @Autowired
+  private CommandProducer commandProducer;
+
+  @Test
+  public void shouldInvokeCommand() throws InterruptedException {
+
+    String commandId = commandProducer.send("CustomerCommandChannel",
+            new DoSomethingCommand(),
+            "ReplyToChannel",
+            Collections.emptyMap());
+...
+----
+Để xử lý reply trả về, chỉ cần sử dụng `MessageConsumer` để subscribe theo `ReplyChannel`:
+
+[source,java]
+----
+messageConsumer.subscribe(subscriberId, "ReplyToChannel", this::handleMessage);
+----
+
+===== Xử lý các command
+Đầu tiên, cần định nghĩa các `CommandHandlers`:
+
+[source,java]
+----
+public class TramCommandTestCommandHandler {
+
+  public Message doSomething(CommandMessage<DoSomethingCommand> cm, PathVariables pvs) {
+    ...
+    return withSuccess();
+  }
+
+  public CommandHandlers getCommandHandlers() {
+    return CommandHandlersBuilder
+            .fromChannel("CustomerCommandChannel")
+            .onMessage(DoSomethingCommand.class, this::doSomething)
+            .build();
+
+  }
+  ...
+----
+
+Sau đó định nghĩa một `CommandDispatcher`:
+
+[source,java]
+----
+@Configuration
+@Import(TramCommandConsumerConfiguration.class)
+public class AbstractTramCommandTestConfiguration {
+
+  @Bean
+  public CommandDispatcher commandDispatcher(CommandDispatcherFactory commandDispatcherFactory,
+                                             AbstractTramCommandTestConfig config,
+                                             AbstractTramCommandTestCommandHandler target) {
+  return commandDispatcherFactory.make("customerServiceCommandDispatcher",
+                                       target.getCommandHandlers());
+}
+...
+----
+
+==== ID Generation
+Mặc định thì Eventuate Tram sử dụng application để sinh các ID cho các message. Nếu sử dụng database để sinh ID thì cần cấu hình `outbox id` mà đã cấu hình cho `Eventuate CDC reader` (VD: `eventuate.outbox.id=1`)
+
+=== Datasource Proxy
+
+Đối với các thao tác liên quan tới DataSource, Microservice Platform triển khai các lớp proxy như `DataSourceProxy, ConnectionProxy, StatementProxy`. Các class proxy này thêm nhiều các thao tác xử lý logic phi chức năng, chủ yếu để phân tích cú pháp SQL, capture lại dữ liệu nghiệp vụ trước và sau các thao tác cập nhật vào insert những thông tin này vào bảng undo_log để đảm bảo rằng mỗi thao tác cập nhật dữ liệu nghiệp vụ đều có log cho việc undo dữ liệu.
+
+.BCCS3 Proxy
+[#img-bccs3_proxy.png]
+[caption="Hình x. "]
+image::bccs3_proxy.png[]
+
+==== Nguyên lý hoạt động
+
+===== Context
+
+Các class Proxy sẽ sử dụng class `RootContext` để xác định xem 1 transaction có cần thực hiện capture và lưu lại undo_log hay không:
+
+[source,java]
+----
+ public static boolean inGlobalTransaction() {
+        return CONTEXT_HOLDER.get(KEY_XID) != null;
+ }
+----
+
+Các service có thể set cho việc bắt đầu capture và lưu undo_log bằng cách gọi:
+
+[source,java]
+----
+RootContext.bind(xid);
+----
+
+Hoặc tạm dừng việc capture và lưu undo_log bằng cách gọi:
+
+[source,java]
+----
+RootContext.unbind();
+----
+
+Mặc định thì `RootContext` implement dựa trên ThreadLocal , tức là XID được liên kết với context của luồng hiện tại.
+
+[source,java]
+----
+public class ThreadLocalContextCore implements ContextCore {
+    private ThreadLocal<Map<String, Object>> threadLocal = ThreadLocal.withInitial(HashMap::new);
+
+    @Override
+    public Object put(String key, Object value) {
+        return threadLocal.get().put(key, value);
+    }
+
+    @Override
+    public Object get(String key) {
+        return threadLocal.get().get(key);
+    }
+
+    @Override
+    public Object remove(String key) {
+        return threadLocal.get().remove(key);
+    }
+
+    @Override
+    public Map<String, Object> entries() {
+        return threadLocal.get();
+    }
+}
+----
+
+
+
+===== Capture dữ liệu
+
+Sử dụng tính ACID của database, thực hiện các thao tác cập nhật dữ liệu nghiệp vụ và lưu bảng undo_log trên cùng 1 transaction.
+.Thực hiện capture dữ liệu trên BCCS3
+[#img-datasource_capture.png]
+[caption="Hình x. "]
+image::datasource_capture.png[]
+
+===== Commit dữ liệu
+
+Khi command thực hiện lời gọi hàm commit, Microservice Platform đơn giản chỉ tìm và xóa các log trong bảng undo_log theo khóa chính. Thao tác này được thực hiện một cách bất đồng bộ nhằm cải thiện hiệu năng.
+
+.Commit dữ liệu
+[#img-datasource_commit.png]
+[caption="Hình x. "]
+image::datasource_commit.png[]
+
+===== Undo dữ liệu
+
+Khi nhận được command thực hiện rollback dữ liệu, datasource proxy sẽ tìm kiếm bản ghi undo_log theo xid (sagaId) và branch_id (thường là service name). Thực hiện validate dữ liệu hiện tại có khớp với giá trị `after` lưu trong undo_log hay không (Có thể cấu hình bỏ qua việc check này). Nếu dữ liệu khớp thì sinh các câu SQL để cập nhật dữ liệu lại cho các bảng nghiệp vụ. Thực thi các câu SQL cho việc undo. Cuối cùng sẽ xóa bản ghi undo_log đó đi và commit trên cùng transaction.
+
+.Undo dữ liệu
+[#img-datasource_undo.png]
+[caption="Hình x. "]
+image::datasource_undo.png[]
+
+===== Phân tích sâu
+
+Đầu tiên, dưới đây là một đoạn code của class `StatementProxy`
+
+image::statement_proxy.jpg[]
+
+Và class `ExecuteTemplate`:
+
+image::execute_template.jpg[]
+
+Do StatementProxy implememnt từ Statement, nên khi gọi `executeUpdate` thì `ExecuteTemplate.execute` sẽ được thực thi, nó sẽ xác định xem lời gọi này có cần phải lưu undo_log hay không bằng cách check xem `RootContext` có chứa giá trị key XID hay không. Nếu không thì nó chỉ forward lời gọi trực tiếp tới Statement gốc mà thôi. Ngược lại thì nó sẽ thực hiện xác định loại của SQL là update, delete, insert hay select... Tương ứng sẽ có các executor sau: `UpdateExecutor, DeleteExecutor, InsertExecutor, PlainExecutor`
+
+image::datasource_class_diagram.jpg[]
+
+====== PlainExecutor
+
+Forward lời gọi trực tiếp tới các API jdbc thuần
+
+====== UpdateExecutor, DeleteExecutor, InsertExecutor
+
+Thực hiện parse các câu sql, capture dữ liệu trước và sau khi thực thi, chúng implement 2 abstract method sau:
+
+[source,java]
+----
+protected abstract TableRecords beforeImage() throws SQLException;
+
+protected abstract TableRecords afterImage(TableRecords beforeImage) throws SQLException;
+----
+
+Dữ liệu capture sẽ được lưu vào bảng undo_log với cấu trúc như sau:
+
+image::undo_log_ddl.PNG[]
+
+Định dạng trường `rollback_info` được lưu dưới định dạng json:
+[source,json]
+----
+{
+    "branchId":3958194,
+    "sqlUndoLogs":[
+        {
+            "afterImage":{
+                "rows":[
+                    {
+                        "fields":[
+                            {
+                                "keyType":"PrimaryKey",
+                                "name":"ID",
+                                "type":4,
+                                "value":10
+                            },
+                            {
+                                "keyType":"NULL",
+                                "name":"COUNT",
+                                "type":4,
+                                "value":98
+                            }
+                        ]
+                    }
+                ],
+                "tableName":"storage_tbl"
+            },
+            "beforeImage":{
+                "rows":[
+                    {
+                        "fields":[
+                            {
+                                "keyType":"PrimaryKey",
+                                "name":"ID",
+                                "type":4,
+                                "value":10
+                            },
+                            {
+                                "keyType":"NULL",
+                                "name":"COUNT",
+                                "type":4,
+                                "value":100
+                            }
+                        ]
+                    }
+                ],
+                "tableName":"storage_tbl"
+            },
+            "sqlType":"UPDATE",
+            "tableName":"storage_tbl"
+        }
+    ],
+    "xid":"192.168.7.77:8091:3958193"
+}
+
+----
+
+
+
+== Danh sách cấu hình
+
+=== Datasource
+
+spring.datasource.url
+
+spring.datasource.username
+
+spring.datasource.password
+
+spring.datasource.driver.class.name
+
+=== Kafka
+
+eventuatelocal.kafka.bootstrap.servers
+
+eventuatelocal.zookeeper.connection.string
+
+==== Kafka Consumer Properties
+
+Có thể ghi đè các cấu hình cho kafka consumer bằng cách định nghĩa các cấu hình kèm với tiền tố:  `eventuate.local.kafka.consumer.properties`.
+
+[cols=2, options="header"]
+|===
+
+| Name
+| Value
+
+| auto.offset.reset
+| earliest
+
+| group.id
+| Random UUID
+
+| enable.auto.commit
+| false
+
+| auto.commit.interval.ms
+| 1000
+
+| session.timeout.ms
+| 30000
+
+| key.deserializer
+| org.apache.kafka.common.serialization.StringDeserializer
+
+| value.deserializer
+| org.apache.kafka.common.serialization.StringDeserializer
+|===
+
+
+
+
+==== Kafka Producer Properties
+
+Có thể ghi đè các cấu hình cho kafka producer bằng cách định nghĩa các cấu hình kèm với tiền tố:  `eventuate.local.kafka.producer.properties`.
+
+[cols=2, options="header"]
+|===
+
+| Name
+| Default Value
+
+| acks
+| all
+
+| retries
+| 0
+
+| batch.size
+| 16384
+
+| linger.ms
+| 1
+
+| buffer.memory
+| 33554432
+
+| key.serializer
+| org.apache.kafka.common.serialization.StringDeserializer
+
+| value.serializer
+| org.apache.kafka.common.serialization.StringDeserializer
+
+|===
+
+== Phụ lục
+
+=== Các lỗi thường gặp
+
+=== Lịch sử phiên bản
+
+=== Eventuate Tram CDC service
+
+Eventuate Tram CDC chịu trách nhiệm đọc các `events/message` được insert vào `outbox table` và publish chúng đến message broker.
+
+.Eventuate CDC
+[#img-Eventuate_CDC.png]
+[caption="Hình 8. "]
+image::Eventuate_CDC.png[]
+
+* Publisher service - service mà thực hiện insert message/event vào `OUTBOX table`
+* Consumer service - service mà consume các message/event
+* OUTBOX table - MESSAGE table
+* Eventuate CDC service - service thực hiện publish các messages/event tới message broker
+* Reader - một thành phần của CDC mà đọc các message đã insert trong outbox table bằng cách sử dụng transaction log tailing hoặc polling (SELECT bảng)
+* Pipeline - convert các the message/event đọc được sang các message để publish tới message broker (topic, queue, exchange,...)
+* Offset Store - Reader dùng để lưu lại giá trị offset mà nó đã đọc outbox table tới vị trí đó (VD: lưu offset đọc MySQL binlog)
+* Publisher - Pipeline sử dụng để publish các message/event tới message broker
+* Zookeeper - Reader chọn leadership để xác định reader được active nếu cấu hình CDC trong cụm cluster
+
+Cấu hình Eventuate tram sử dụng style của spring boot do nó được viết dựa trên spring boot. Và có thể cấu hình bằng các biến môi trường trong container khi deploy.
+
+==== Cấu hình Single pipeline
+
+===== Reader
+
+[cols=4, options="header"]
+|===
+| property | Description | Default value | Reader property name
+
+| spring.datasource.url | JDBC connection url | - | dataSourceUrl
+| spring.datasource.username | Username connect tới database | - | dataSourceUserName
+| spring.datasource.password | Password connect tới database| - | dataSourcePassword
+
+| spring.datasource.driver.class.name
+| Jdbc driver class name
+| -
+| dataSourceDriverClassName
+
+| eventuatelocal.cdc.leadership.lock.path
+| Zookeeper node path sử dụng để chọn leadership
+| `/eventuatelocal/cdc/leader/1`
+| leadershipLockPath
+
+| eventuatelocal.cdc.offset.store.key
+| mysql binlog sử dụng key này để lưu giá trị offset
+|
+| offsetStoreKey
+
+| eventuatelocal.cdc.reader.name
+| Tên của reader. Nếu không cấu hình eventuatelocal.cdc.offset.store.key thì nó sẽ được sử dụng bởi mysql binlog reader như là key để lưu giá trị offset mà cdc đã đọc tới
+| -
+| -
+
+| eventuatelocal.cdc.offset.storage.topic.name
+| (mysql-binlog)
+
+Topic Kafka dùng để lưu giá trị binlog offset mà cdc đã đọc tới
+| `offset.storage.topic`
+| offsetStorageTopicName
+
+| eventuatelocal.cdc.binlog.connection.timeout.in.milliseconds
+| (chỉ mysql-binlog)
+
+Thời gian timeout khi connect tới binlog
+| 5000
+| binlogConnectionTimeoutInMilliseconds
+
+| eventuatelocal.cdc.max.attempts.for.binlog.connection
+| (chỉ mysql-binlog)
+
+Số lần tối đa thực hiện kết nối lại tới binlog nếu lỗi
+| 100
+| maxAttemptsForBinlogConnection
+
+| eventuatelocal.cdc.db.user.name
+| (mysql-binlog only)
+
+MySQL reader sử dụng username mà được cấp quyền đọc các event binlog từ database. Thường là ‘root’.
+| -
+| cdcDbUserName
+
+| eventuatelocal.cdc.db.password
+| (chỉ mysql-binlog)
+
+Password của MYSQL reader user.
+| -
+| cdcDbPassword
+
+| eventuatelocal.cdc.mysql.binlog.client.unique.id
+| (chỉ mysql-binlog)
+
+Id duy nhất cho mỗi replication client
+| -
+| mySqlBinlogClientUniqueId
+
+| eventuatelocal.cdc.polling.interval.in.milliseconds
+| (chỉ polling)
+
+Thời gian sleep giữa mỗi lần polling
+| 500
+| pollingIntervalInMilliseconds
+
+| eventuatelocal.cdc.max.events.per.polling
+| (polling only)
+
+Event count requested by each polling query
+| 1000
+| maxEventsPerPolling
+
+| eventuatelocal.cdc.max.attempts.for.polling
+| (polling only)
+
+Số lần thử lại tối đa nếu polling bị lỗi
+| 100
+| maxAttemptsForPolling
+
+| eventuatelocal.cdc.polling.retry.interval.in.milleseconds
+| (chỉ polling)
+
+Thời gian sleep trước khi thực hiện polling lại
+| 500
+| pollingRetryIntervalInMilliseconds
+
+| eventuate.outbox.id
+| Số nguyên duy nhất (unsigned 48 bit) dùng để sinh id cho event/message nếu event/message id bị thiếu.
+
+| -
+| outboxId
+
+|===
+
+===== Pipeline
+
+[cols=4, options="header"]
+|===
+| property
+| Description
+| Default value
+| Pipeline property name
+
+| eventuate.database.schema
+| Schema của bảng message
+| eventuate
+| eventuateDatabaseSchema
+
+| eventuatelocal.cdc.source.table.name
+| Tên bảng message.
+
+|`MESSAGE` (eventuate-tram).
+| sourceTableName
+
+|===
+
+==== Cấu hình Multi-pipeline
+
+===== Reader
+
+Reader được định nghĩa sử dụng Spring framework properties tuân theo cú pháp sau: `eventuate.cdc.reader.<reader name>.<property name>`.
+VD: cấu hình reader `READER1` sử dụng biến môi trường sẽ có dạng như sau:
+
+----
+EVENTUATE_CDC_READER_READER1_TYPE: mysql-binlog
+EVENTUATE_CDC_READER_READER1_DATASOURCEURL: jdbc:mysql://${DOCKER_HOST_IP}:3306/eventuate
+EVENTUATE_CDC_READER_READER1_DATASOURCEUSERNAME: mysqluser
+...
+----
+
+
+[cols=3, options="header"]
+|===
+| Name | Description | Default Value
+
+| type
+| Type of the reading mechanism. Supported types are `mysql-binlog`, `polling`, and `postgres-wal`.
+| -
+
+| dataSourceUrl
+| JDBC connection url
+| -
+
+| dataSourceUserName
+| Username connect tới database
+| -
+
+| dataSourcePassword
+| Password connect tới database
+| -
+
+| dataSourceDriverClassName
+| Jdbc driver class name
+| -
+
+| leadershipLockPath
+| Zookeeper node path sử dụng để chọn leadership. VD: `/eventuatelocal/cdc/leader/1`
+| -
+
+| offsetStorageTopicName
+| (mysql-binlog)
+
+Topic Kafka dùng để lưu giá trị binlog offset mà cdc đã đọc tới
+| `offset.storage.topic`
+
+| binlogConnectionTimeoutInMilliseconds
+| (mysql-binlog, postgres-wal only)
+
+Thời gian timeout khi connect tới binlog.
+| 5000
+
+| maxAttemptsForBinlogConnection
+| (mysql-binlog, postgres-wal only)
+
+Số lần tối đa thử connect lại tới binlog khi lỗi.
+| 100
+
+| cdcDbUserName
+| (mysql-binlog only)
+
+MySQL reader sử dụng username mà được cấp quyền đọc các event binlog từ database. Thường là ‘root’’.
+| -
+
+| cdcDbPassword
+| (mysql-binlog only)
+
+Password của MYSQL reader user.
+| -
+
+| mySqlBinlogClientUniqueId
+| (mysql-binlog only)
+
+Id duy nhất cho mỗi replication client.
+| pollingIntervalInMilliseconds
+| (polling only)
+
+Thời gian sleep giữa mỗi lần polling
+| 500
+
+| maxEventsPerPolling
+| (polling only)
+
+Số lượng event tối đa mỗi lần by each polling query
+| 1000
+
+| maxAttemptsForPolling
+| (polling only)
+
+Số lần thử lại tối đa nếu polling bị lỗi
+| 100
+
+| pollingRetryIntervalInMilliseconds
+| (polling only)
+
+Thời gian sleep trước khi thực hiện polling lại
+| 500
+
+| outboxId
+| Số nguyên duy nhất (unsigned 48 bit) dùng để sinh id cho event/message nếu event/message id bị thiếu.
+
+| -
+
+
+|===
+
+===== Pipeline
+
+[cols=3, options="header"]
+|===
+| Name
+| Description
+| Default Value
+
+| type
+| Loại pipline
+
+The Eventuate Tram CDC supports `eventuate-tram` and `eventuate-local`
+| -
+
+| eventuateDatabaseSchema
+| schema của outbox table
+| `eventuate`
+
+| sourceTableName
+| Tên outbox table
+
+`message` (eventuate-tram).
+
+| reader
+| Tên của reader
+| -
+
+|===
+
+==== Cấu hình publisher
+
+
+[cols=3, options="header"]
+|===
+| Name
+| Description
+| Default Value
+
+| eventuatelocal.kafka.bootstrap.servers
+| danh sách broker (cách nhau bởi dấu phẩy)
+| -
+
+| eventuate.cdc.kafka.enable.batch.processing
+| Cho phép send message tới kafka theo lô
+| false
+
+
+| eventuate.cdc.kafka.batch.processing.max.batch.size
+| Số lượng message tối đa theo khi send theo lô
+| 1000000
+|===
+
+
+==== Cấu hình tham khảo
+
+[source,yml]
+----
+tram-cdc-service:
+  image: eventuateio/eventuate-cdc-service:LATEST_VERSION
+  ….
+  environment:
+    EVENTUATELOCAL_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    EVENTUATELOCAL_ZOOKEEPER_CONNECTION_STRING: zookeeper:2181
+
+    EVENTUATE_CDC_PIPELINE_PIPELINE1_TYPE: eventuate-local
+    EVENTUATE_CDC_PIPELINE_PIPELINE1_READER: reader1
+
+    EVENTUATE_CDC_PIPELINE_PIPELINE2_TYPE: eventuate-tram
+    EVENTUATE_CDC_PIPELINE_PIPELINE2_READER: reader2
+
+    EVENTUATE_CDC_READER_READER1_TYPE: mysql-binlog
+    EVENTUATE_CDC_READER_READER1_DATASOURCEURL: jdbc:mysql://${DOCKER_HOST_IP}:3306/eventuate
+    EVENTUATE_CDC_READER_READER1_DATASOURCEUSERNAME: mysqluser
+    EVENTUATE_CDC_READER_READER1_DATASOURCEPASSWORD: mysqlpw
+    EVENTUATE_CDC_READER_READER1_DATASOURCEDRIVERCLASSNAME: com.mysql.jdbc.Driver
+    EVENTUATE_CDC_READER_READER1_LEADERSHIPLOCKPATH: /eventuate/cdc/leader/eventuatelocal
+    EVENTUATE_CDC_READER_READER1_MYSQLBINLOGCLIENTUNIQUEID: 1
+    EVENTUATE_CDC_READER_READER1_CDCDBUSERNAME: root
+    EVENTUATE_CDC_READER_READER1_CDCDBPASSWORD: rootpassword
+    EVENTUATE_CDC_READER_READER1_READOLDDEBEZIUMDBOFFSETSTORAGETOPIC: "false"
+    EVENTUATE_CDC_READER_READER1_OFFSETSTORAGETOPICNAME: db.history.eventuate.local
+    EVENTUATE_CDC_READER_READER1_OFFSETSTOREKEY: ClientEventuateLocal
+
+    EVENTUATE_CDC_READER_READER2_TYPE: mysql-binlog
+    EVENTUATE_CDC_READER_READER2_DATASOURCEURL: jdbc:mysql://${DOCKER_HOST_IP}:3306/eventuate
+    EVENTUATE_CDC_READER_READER2_DATASOURCEUSERNAME: mysqluser
+    EVENTUATE_CDC_READER_READER2_DATASOURCEPASSWORD: mysqlpw
+    EVENTUATE_CDC_READER_READER2_DATASOURCEDRIVERCLASSNAME: com.mysql.jdbc.Driver
+    EVENTUATE_CDC_READER_READER2_LEADERSHIPLOCKPATH: /eventuate/cdc/leader/eventuatetram
+    EVENTUATE_CDC_READER_READER2_MYSQLBINLOGCLIENTUNIQUEID: 2
+    EVENTUATE_CDC_READER_READER2_CDCDBUSERNAME: root
+    EVENTUATE_CDC_READER_READER2_CDCDBPASSWORD: rootpassword
+    EVENTUATE_CDC_READER_READER2_READOLDDEBEZIUMDBOFFSETSTORAGETOPIC: "false"
+    EVENTUATE_CDC_READER_READER2_OFFSETSTORAGETOPICNAME: db.history.eventuate.tram
+    EVENTUATE_CDC_READER_READER2_OFFSETSTOREKEY: ClientEventuateTram
+----
